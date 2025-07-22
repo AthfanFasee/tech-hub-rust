@@ -3,13 +3,44 @@ use std::net::TcpListener;
 use uuid::Uuid;
 use moodfeed::configuration::{get_config, DatabaseConfigs};
 use moodfeed::startup::run;
+use moodfeed::telemetry;
+use std::sync::LazyLock;
+use secrecy::{ExposeSecret, Secret};
 
 pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,
 }
 
+// Ensure that the `tracing` stack is only initialised once using `LazyLock`
+static TRACING: LazyLock<()> = LazyLock::new(|| {
+    let default_filter_level = "info".to_string();
+    let subscriber_name = "test".to_string();
+
+    // If TEST_LOG env variable is set then output the logs to std out while running tests. Otherwise skip
+    if std::env::var("TEST_LOG").is_ok() {
+        let subscriber = telemetry::get_subscriber(
+            subscriber_name,
+            default_filter_level,
+            std::io::stdout
+        );
+        telemetry::init_subscriber(subscriber);
+    } else {
+        let subscriber = telemetry::get_subscriber(
+            subscriber_name,
+            default_filter_level,
+            std::io::sink
+        );
+        telemetry::init_subscriber(subscriber);
+    };
+});
+
+
 async fn spawn_app() -> TestApp {
+    // The first time `initialize` is invoked the code in `TRACING` is executed.
+    // All other invocations will instead skip execution.
+    LazyLock::force(&TRACING);
+
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
     // We retrieve the port assigned to us by the OS
     let port = listener.local_addr().unwrap().port();
@@ -32,10 +63,10 @@ pub async fn configure_database(config: &DatabaseConfigs) -> PgPool {
     let maintenance_settings = DatabaseConfigs {
         database_name: "postgres".to_string(),
         username: "postgres".to_string(),
-        password: "password".to_string(),
+        password: Secret::new("password".to_string()),
         ..config.clone()
     };
-    let mut connection = PgConnection::connect(&maintenance_settings.connection_string())
+    let mut connection = PgConnection::connect(maintenance_settings.connection_string().expose_secret())
         .await
         .expect("Failed to connect to Postgres");
     connection
@@ -44,7 +75,7 @@ pub async fn configure_database(config: &DatabaseConfigs) -> PgPool {
         .expect("Failed to create database.");
 
     // Migrate database
-    let connection_pool = PgPool::connect(&config.connection_string())
+    let connection_pool = PgPool::connect(&config.connection_string().expose_secret())
         .await
         .expect("Failed to connect to Postgres.");
     sqlx::migrate!("./migrations")
@@ -71,7 +102,7 @@ async fn health_check_works() {
 }
 
 #[tokio::test]
-async fn subscribe_returns_a_200_for_valid_json_data() {
+async fn add_user_returns_a_200_for_valid_json_data() {
     let app = spawn_app().await;
     let client = reqwest::Client::new();
 
@@ -81,7 +112,7 @@ async fn subscribe_returns_a_200_for_valid_json_data() {
     });
 
     let response = client
-        .post(format!("{}/subscriptions", app.address))
+        .post(format!("{}/user/add", app.address))
         .header("Content-Type", "application/json")
         .json(&payload) // Automatically sets body and content-type
         .send()
@@ -93,14 +124,14 @@ async fn subscribe_returns_a_200_for_valid_json_data() {
     let saved = sqlx::query!("SELECT email, name FROM users",)
         .fetch_one(&app.db_pool)
         .await
-        .expect("Failed to fetch saved subscription.");
+        .expect("Failed to fetch saved user data.");
 
     assert_eq!(saved.email, "athfantest@gmail.com");
     assert_eq!(saved.name, "athfantest");
 }
 
 #[tokio::test]
-async fn subscribe_returns_a_400_when_data_is_missing() {
+async fn add_user_returns_a_400_when_data_is_missing() {
     let app = spawn_app().await;
     let client = reqwest::Client::new();
 
@@ -112,7 +143,7 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
 
     for (invalid_payload, _error_message) in test_cases {
         let response = client
-            .post(format!("{}/subscriptions", &app.address))
+            .post(format!("{}/user/add", &app.address))
             .header("Content-Type", "application/json")
             .json(&invalid_payload)
             .send()
