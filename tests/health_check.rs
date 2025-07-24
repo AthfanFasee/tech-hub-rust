@@ -5,7 +5,7 @@ use moodfeed::configuration::{get_config, DatabaseConfigs};
 use moodfeed::startup::run;
 use moodfeed::telemetry;
 use std::sync::LazyLock;
-use secrecy::{ExposeSecret, Secret};
+use secrecy::Secret;
 
 pub struct TestApp {
     pub address: String,
@@ -66,18 +66,22 @@ pub async fn configure_database(config: &DatabaseConfigs) -> PgPool {
         password: Secret::new("password".to_string()),
         ..config.clone()
     };
-    let mut connection = PgConnection::connect(maintenance_settings.connection_string().expose_secret())
+    let mut connection = PgConnection::connect_with(
+        &maintenance_settings.connect_options()
+    )
         .await
         .expect("Failed to connect to Postgres");
+
     connection
         .execute(format!(r#"CREATE DATABASE "{}";"#, config.database_name).as_str())
         .await
         .expect("Failed to create database.");
 
     // Migrate database
-    let connection_pool = PgPool::connect(&config.connection_string().expose_secret())
+    let connection_pool = PgPool::connect_with(config.connect_options())
         .await
         .expect("Failed to connect to Postgres.");
+
     sqlx::migrate!("./migrations")
         .run(&connection_pool)
         .await

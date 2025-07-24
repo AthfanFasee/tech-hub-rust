@@ -1,6 +1,5 @@
 use std::net::TcpListener;
-use secrecy::ExposeSecret;
-use sqlx::PgPool;
+use sqlx::postgres::PgPoolOptions;
 use moodfeed::startup::run;
 use moodfeed::configuration;
 use moodfeed::telemetry;
@@ -19,11 +18,15 @@ async fn try_main() -> Result<(), std::io::Error> {
     
     let config = configuration::get_config().expect("Failed to read config");
 
-    let connection_pool = PgPool::connect(config.database.connection_string().expose_secret())
-        .await
-        .expect("Failed to connect to Postgres database");
+    let connection_pool = PgPoolOptions::new()
+        // `connect_lazy_with` instead of `connect_lazy`
+        .connect_lazy_with(config.database.connect_options());
 
-    let address = format!("127.0.0.1:{}", config.application_port);
+
+    let address = format!(
+        "{}:{}",
+        config.application.host, config.application.port
+    );
     let listener = TcpListener::bind(address)?;
     run(listener, connection_pool)?.await
 }
