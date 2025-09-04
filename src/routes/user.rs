@@ -2,11 +2,24 @@ use actix_web::{web, HttpResponse};
 use serde::Deserialize;
 use sqlx::PgPool;
 use uuid::Uuid;
+use crate::domain::{NewUser, UserName, UserEmail};
 
 #[derive(Deserialize)]
 pub struct UserData {
     email: String,
     name: String,
+}
+
+// This is like saying - I know how to build myself (NewUser) from something else (UserData)
+// Then Rust lets us use `.try_into` whenever there's a UserData (where it automatically tries converting it to a NewUser)
+impl TryFrom<UserData> for NewUser {
+    type Error = String;
+
+    fn try_from(payload: UserData) -> Result<Self, Self::Error> {
+        let name = UserName::parse(payload.name)?;
+        let email = UserEmail::parse(payload.email)?;
+        Ok(Self { name, email })
+    }
 }
 
 #[tracing::instrument(
@@ -18,7 +31,12 @@ pub struct UserData {
     )
 )]
 pub async fn add_user(payload: web::Json<UserData>, pool: web::Data<PgPool>) -> HttpResponse {
-  match insert_user(&payload, &pool).await
+    let new_user = match payload.0.try_into() {
+        Ok(payload) => payload,
+        Err(_) => return HttpResponse::BadRequest().finish(),
+    };
+
+    match insert_user(&new_user, &pool).await
     {
         Ok(_) => HttpResponse::Ok().finish(),
         Err(_) => HttpResponse::InternalServerError().finish()
@@ -26,11 +44,11 @@ pub async fn add_user(payload: web::Json<UserData>, pool: web::Data<PgPool>) -> 
 }
 
 #[tracing::instrument(
-name = "Saving new user details in the database",
-skip(payload, pool)
+    name = "Saving new user details in the database",
+    skip(new_user, pool)
 )]
 pub async fn insert_user(
-    payload: &UserData,
+    new_user: &NewUser,
     pool: &PgPool,
 ) -> Result<(), sqlx::Error> {
     sqlx::query!(
@@ -39,8 +57,8 @@ pub async fn insert_user(
 	    VALUES ($1, $2, $3)
 	   "#,
         Uuid::new_v4(),
-        payload.name,
-        payload.email,
+        new_user.name.as_ref(),
+        new_user.email.as_ref(),
     ).execute(pool)
         .await
         .map_err(|e| {
