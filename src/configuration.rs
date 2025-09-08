@@ -45,6 +45,7 @@ pub struct DatabaseConfigs {
 pub struct ApplicationSettings {
     pub port: u16,
     pub host: String,
+    pub base_url: String
 }
 
 pub fn get_config() -> Result<Configuration, config::ConfigError> {

@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS "tokens" (
+token TEXT NOT NULL,
+user_id UUID NOT NULL REFERENCES users(id),
+is_subscription BOOLEAN NOT NULL DEFAULT FALSE,
+is_activation BOOLEAN NOT NULL DEFAULT FALSE,
+PRIMARY KEY (token)
+);
+
+

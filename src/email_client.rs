@@ -74,7 +74,7 @@ impl EmailClient {
             html_body: html_content,
             text_body: text_content,
         };
-
+        
         self.http_client
             .post(url)
             .header(

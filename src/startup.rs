@@ -2,7 +2,7 @@ use std::net::TcpListener;
 use actix_web::dev::Server;
 use actix_web::{web, App, HttpServer};
 use sqlx::PgPool;
-use crate::routes::{health_check, add_user};
+use crate::routes::{health_check, add_user, user_confirm};
 use tracing_actix_web::TracingLogger;
 use crate::email_client::EmailClient;
 use crate::configuration::{Configuration, DatabaseConfigs};
@@ -37,7 +37,7 @@ impl Application {
         );
         let listener = TcpListener::bind(address)?;
         let port = listener.local_addr()?.port();
-        let server = run(listener, connection_pool, email_client)?;
+        let server = run(listener, connection_pool, email_client, config.application.base_url)?;
 
         Ok(Self { port, server })
     }
@@ -56,21 +56,28 @@ pub fn get_connection_pool(config: &DatabaseConfigs) -> PgPool {
         .connect_lazy_with(config.connect_options())
 }
 
+pub struct ApplicationBaseUrl(pub String);
+
 pub fn run(
     tcp_listener: TcpListener, 
     db_pool: PgPool, 
     email_client: EmailClient,
+    base_url: String,
 ) -> Result<Server, std::io::Error> {
     let db_pool = web::Data::new(db_pool);
     let email_client = web::Data::new(email_client);
+    let base_url = web::Data::new(ApplicationBaseUrl(base_url));
+    
     let server = HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())
             .route("/health_check", web::get().to(health_check))
             .route("/user/add", web::post().to(add_user))
+            .route("/user/confirm", web::get().to(user_confirm))
             // register the db connection as part of the application state
             .app_data(db_pool.clone())
             .app_data(email_client.clone())
+            .app_data(base_url.clone())
     })
         .listen(tcp_listener)?
         .run();
