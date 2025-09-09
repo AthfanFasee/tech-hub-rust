@@ -1,6 +1,6 @@
 use actix_web::{web, HttpResponse};
 use serde::Deserialize;
-use sqlx::PgPool;
+use sqlx::{Postgres, Transaction, Executor, PgPool};
 use uuid::Uuid;
 use crate::domain::{NewUser, UserName, UserEmail};
 use crate::email_client::EmailClient;
@@ -8,6 +8,7 @@ use crate::email_client::EmailError;
 use crate::startup::ApplicationBaseUrl;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
+use actix_web::ResponseError;
 
 #[derive(Deserialize)]
 pub struct UserData {
@@ -46,17 +47,26 @@ pub async fn add_user(
         Err(_) => return HttpResponse::BadRequest().finish(),
     };
 
-    let user_id = match insert_user(&new_user, &pool).await {
+    let mut transaction = match pool.begin().await {
+        Ok(transaction) => transaction,
+        Err(_) => return HttpResponse::InternalServerError().finish(),
+    };
+
+    let user_id = match insert_user(&new_user, &mut transaction).await {
         Ok(user_id) => user_id,
         Err(_) => return HttpResponse::InternalServerError().finish(),
     };
 
     let activation_token = generate_token();
 
-    if store_token(&pool, user_id, &activation_token, true)
+    if store_token(&mut transaction, user_id, &activation_token, true)
         .await
         .is_err()
     {
+        return HttpResponse::InternalServerError().finish();
+    }
+
+    if transaction.commit().await.is_err() {
         return HttpResponse::InternalServerError().finish();
     }
 
@@ -70,22 +80,23 @@ pub async fn add_user(
 
 #[tracing::instrument(
     name = "Store token in the database",
-    skip(token, pool)
+    skip(token, transaction)
 )]
 pub async fn store_token(
-    pool: &PgPool,
+    transaction: &mut Transaction<'_, Postgres>,
     user_id: Uuid,
     token: &str,
     is_activation: bool,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query!(
-        r#"INSERT INTO tokens (token, user_id, is_activation)
-        VALUES ($1, $2, $3)"#,
-        token,
-        user_id,
-        is_activation,
-        )
-        .execute(pool)
+    let query = sqlx::query!(
+            r#"INSERT INTO tokens (token, user_id, is_activation)
+            VALUES ($1, $2, $3)"#,
+            token,
+            user_id,
+            is_activation,
+        );
+    
+    transaction.execute(query)
         .await
         .map_err(|e| {
             tracing::error!("Failed to execute query: {:?}", e);
@@ -95,24 +106,26 @@ pub async fn store_token(
 }
 
 #[tracing::instrument(
-    name = "Saving new user details in the database",
-    skip(new_user, pool)
+    name = "Save new user details in the database",
+    skip(new_user, transaction)
 )]
 pub async fn insert_user(
     new_user: &NewUser,
-    pool: &PgPool,
+    transaction: &mut Transaction<'_, Postgres>,
 ) -> Result<Uuid, sqlx::Error> {
     let user_id = Uuid::new_v4();
-    sqlx::query!(
-        r#"
-        INSERT INTO users (id, name, email, password_hash)
-	    VALUES ($1, $2, $3, $4)
-	   "#,
-        user_id,
-        new_user.name.as_ref(),
-        new_user.email.as_ref(),
-        "dummy_hash",
-    ).execute(pool)
+    let query = sqlx::query!(
+            r#"
+            INSERT INTO users (id, name, email, password_hash)
+            VALUES ($1, $2, $3, $4)
+           "#,
+            user_id,
+            new_user.name.as_ref(),
+            new_user.email.as_ref(),
+            "dummy_hash",
+        );
+    
+    transaction.execute(query)
         .await
         .map_err(|e| {
             tracing::error!("Failed to execute query: {:?}", e);

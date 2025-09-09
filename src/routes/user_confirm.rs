@@ -60,10 +60,10 @@ pub async fn get_user_id_from_token(
     token: &str,
 ) -> Result<Option<Uuid>, sqlx::Error> {
     let result = sqlx::query!(
-        "SELECT user_id FROM tokens \
-        WHERE token = $1",
-        token,
-    )
+            "SELECT user_id FROM tokens \
+            WHERE token = $1",
+            token,
+        )
         .fetch_optional(pool)
         .await
         .map_err(|e| {
