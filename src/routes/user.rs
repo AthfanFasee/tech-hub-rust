@@ -1,14 +1,16 @@
-use actix_web::{web, HttpResponse};
-use serde::Deserialize;
-use sqlx::{Postgres, Transaction, Executor, PgPool};
-use uuid::Uuid;
-use crate::domain::{NewUser, UserName, UserEmail};
+use crate::domain::{NewUser, UserEmail, UserName};
 use crate::email_client::EmailClient;
 use crate::email_client::EmailError;
 use crate::startup::ApplicationBaseUrl;
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
 use actix_web::ResponseError;
+use actix_web::http::StatusCode;
+use actix_web::{HttpResponse, web};
+use anyhow::Context;
+use rand::distributions::Alphanumeric;
+use rand::{Rng, thread_rng};
+use serde::Deserialize;
+use sqlx::{Executor, PgPool, Postgres, Transaction};
+use uuid::Uuid;
 
 #[derive(Deserialize)]
 pub struct UserData {
@@ -28,8 +30,53 @@ impl TryFrom<UserData> for NewUser {
     }
 }
 
+pub fn error_chain_fmt(
+    e: &(dyn std::error::Error),
+    f: &mut std::fmt::Formatter<'_>,
+) -> std::fmt::Result {
+    // Top-level: use Display to avoid recursion
+    writeln!(f, "{e}\n")?;
+
+    let mut current = e.source();
+    while let Some(cause) = current {
+        // For causes: use Debug if caller asked for `:#?` (`tracing::debug!("{:#?}", err)`), else Display (`tracing::error!("{:?}", err)`)
+        if f.alternate() {
+            writeln!(f, "Caused by:\n\t{cause:?}")?;
+        } else {
+            writeln!(f, "Caused by:\n\t{cause}")?;
+        }
+        current = cause.source();
+    }
+    Ok(())
+}
+
+#[derive(thiserror::Error)]
+pub enum UserError {
+    // the 0 is something like `self.0` and will print the String value the ValidationError wraps around
+    #[error("{0}")]
+    ValidationError(String),
+
+    #[error(transparent)]
+    UnexpectedError(#[from] anyhow::Error),
+}
+
+impl std::fmt::Debug for UserError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        error_chain_fmt(self, f)
+    }
+}
+
+impl ResponseError for UserError {
+    fn status_code(&self) -> StatusCode {
+        match self {
+            UserError::ValidationError(_) => StatusCode::BAD_REQUEST,
+            UserError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
+
 #[tracing::instrument(
-    name = "Adding a new user",
+    name = "Add a new user",
     skip(pool, payload, email_client, base_url),
     fields(
         user_email = %payload.email,
@@ -40,69 +87,35 @@ pub async fn add_user(
     payload: web::Json<UserData>,
     pool: web::Data<PgPool>,
     email_client: web::Data<EmailClient>,
-    base_url: web::Data<ApplicationBaseUrl>
-) -> HttpResponse {
-    let new_user = match payload.0.try_into() {
-        Ok(payload) => payload,
-        Err(_) => return HttpResponse::BadRequest().finish(),
-    };
+    base_url: web::Data<ApplicationBaseUrl>,
+) -> Result<HttpResponse, UserError> {
+    let new_user = payload.0.try_into().map_err(UserError::ValidationError)?;
 
-    let mut transaction = match pool.begin().await {
-        Ok(transaction) => transaction,
-        Err(_) => return HttpResponse::InternalServerError().finish(),
-    };
+    let mut transaction = pool
+        .begin()
+        .await
+        .context("Failed to acquire a Postgres connection from the pool")?;
 
-    let user_id = match insert_user(&new_user, &mut transaction).await {
-        Ok(user_id) => user_id,
-        Err(_) => return HttpResponse::InternalServerError().finish(),
-    };
+    let user_id = insert_user(&new_user, &mut transaction)
+        .await
+        .context("Failed to insert new user in the database")?;
 
     let activation_token = generate_token();
 
-    if store_token(&mut transaction, user_id, &activation_token, true)
+    store_activation_token(&mut transaction, user_id, &activation_token)
         .await
-        .is_err()
-    {
-        return HttpResponse::InternalServerError().finish();
-    }
+        .context("Failed to store the confirmation token for new user")?;
 
-    if transaction.commit().await.is_err() {
-        return HttpResponse::InternalServerError().finish();
-    }
-
-    if let Err(e) = send_confirmation_email(&email_client, new_user, &base_url.0, &activation_token).await {
-        tracing::error!("Failed to send confirmation email: {:?}", e);
-        return HttpResponse::InternalServerError().finish();
-    }
-
-    HttpResponse::Ok().finish()
-}
-
-#[tracing::instrument(
-    name = "Store token in the database",
-    skip(token, transaction)
-)]
-pub async fn store_token(
-    transaction: &mut Transaction<'_, Postgres>,
-    user_id: Uuid,
-    token: &str,
-    is_activation: bool,
-) -> Result<(), sqlx::Error> {
-    let query = sqlx::query!(
-            r#"INSERT INTO tokens (token, user_id, is_activation)
-            VALUES ($1, $2, $3)"#,
-            token,
-            user_id,
-            is_activation,
-        );
-    
-    transaction.execute(query)
+    transaction
+        .commit()
         .await
-        .map_err(|e| {
-            tracing::error!("Failed to execute query: {:?}", e);
-            e
-        })?;
-    Ok(())
+        .context("Failed to commit SQL transaction to store a new user")?;
+
+    send_confirmation_email(&email_client, new_user, &base_url.0, &activation_token)
+        .await
+        .context("Failed to send a confirmation email when registering new user")?;
+
+    Ok(HttpResponse::Ok().finish())
 }
 
 #[tracing::instrument(
@@ -115,29 +128,40 @@ pub async fn insert_user(
 ) -> Result<Uuid, sqlx::Error> {
     let user_id = Uuid::new_v4();
     let query = sqlx::query!(
-            r#"
+        r#"
             INSERT INTO users (id, name, email, password_hash)
             VALUES ($1, $2, $3, $4)
            "#,
-            user_id,
-            new_user.name.as_ref(),
-            new_user.email.as_ref(),
-            "dummy_hash",
-        );
-    
-    transaction.execute(query)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to execute query: {:?}", e);
-            e
-        })?;
+        user_id,
+        new_user.name.as_ref(),
+        new_user.email.as_ref(),
+        "dummy_hash",
+    );
 
+    transaction.execute(query).await?;
     Ok(user_id)
+}
+#[tracing::instrument(name = "Store token in the database", skip(token, transaction))]
+pub async fn store_activation_token(
+    transaction: &mut Transaction<'_, Postgres>,
+    user_id: Uuid,
+    token: &str,
+) -> Result<(), sqlx::Error> {
+    let query = sqlx::query!(
+        r#"INSERT INTO tokens (token, user_id, is_activation)
+            VALUES ($1, $2, $3)"#,
+        token,
+        user_id,
+        true,
+    );
+
+    transaction.execute(query).await?;
+    Ok(())
 }
 
 #[tracing::instrument(
-name = "Send a confirmation email to a new user",
-skip(email_client, new_user)
+    name = "Send a confirmation email to new user",
+    skip(email_client, new_user)
 )]
 pub async fn send_confirmation_email(
     email_client: &EmailClient,
@@ -146,20 +170,14 @@ pub async fn send_confirmation_email(
     token: &str,
 ) -> Result<(), EmailError> {
     let confirmation_link = format!("{base_url}/user/confirm?token={token}");
-    let plain_body = format!(
-        "Welcome to Moodfeed!\nVisit {confirmation_link} to confirm your subscription.",
-    );
+    let plain_body =
+        format!("Welcome to Moodfeed!\nVisit {confirmation_link} to confirm your subscription.",);
     let html_body = format!(
         "Welcome to Moodfeed!<br />\
-Click <a href=\"{confirmation_link}\">here</a> to confirm your subscription.",
+        Click <a href=\"{confirmation_link}\">here</a> to confirm your subscription.",
     );
     email_client
-        .send_email(
-            new_user.email,
-            "Welcome!",
-            &html_body,
-            &plain_body,
-        )
+        .send_email(new_user.email, "Welcome!", &html_body, &plain_body)
         .await
 }
 

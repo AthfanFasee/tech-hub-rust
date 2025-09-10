@@ -2,7 +2,6 @@ use crate::helpers::spawn_app;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
 
-
 #[tokio::test]
 async fn add_user_returns_a_200_for_valid_json_data() {
     let app = spawn_app().await;
@@ -17,7 +16,6 @@ async fn add_user_returns_a_200_for_valid_json_data() {
         .respond_with(ResponseTemplate::new(200))
         .mount(&app.email_server)
         .await;
-
 
     let response = app.add_user(&payload).await;
 
@@ -39,7 +37,6 @@ async fn add_user_persists_the_new_user() {
         .mount(&app.email_server)
         .await;
 
-
     app.add_user(&payload).await;
 
     let saved = sqlx::query!("SELECT email, name, is_activated, is_subscribed FROM users",)
@@ -59,7 +56,10 @@ async fn add_user_returns_a_400_when_data_is_missing() {
 
     let test_cases = vec![
         (serde_json::json!({ "name": "athfan" }), "missing the email"),
-        (serde_json::json!({ "email": "athfantest@gmail.com" }), "missing the name"),
+        (
+            serde_json::json!({ "email": "athfantest@gmail.com" }),
+            "missing the name",
+        ),
         (serde_json::json!({}), "missing both name and email"),
     ];
 
@@ -79,10 +79,22 @@ async fn add_user_returns_a_400_when_data_is_present_but_invalid() {
     let app = spawn_app().await;
 
     let test_cases = vec![
-        (serde_json::json!({ "name": "athfan", "email": "" }), "empty email string"),
-        (serde_json::json!({ "email": "athfantest@gmail.com", "name": "" }), "empty name string"),
-        (serde_json::json!({"name": "athfan", "email": "definitely wrong email"}), "invalid email address"),
-        (serde_json::json!({"name": "ath/fan)", "email": "athfantest@gmail.com"}), "name contains invalid characters"),
+        (
+            serde_json::json!({ "name": "athfan", "email": "" }),
+            "empty email string",
+        ),
+        (
+            serde_json::json!({ "email": "athfantest@gmail.com", "name": "" }),
+            "empty name string",
+        ),
+        (
+            serde_json::json!({"name": "athfan", "email": "definitely wrong email"}),
+            "invalid email address",
+        ),
+        (
+            serde_json::json!({"name": "ath/fan)", "email": "athfantest@gmail.com"}),
+            "name contains invalid characters",
+        ),
     ];
 
     for (invalid_payload, _error_message) in test_cases {
@@ -145,15 +157,14 @@ async fn add_user_fails_if_there_is_a_fatal_database_error() {
         "name": "athfantest",
         "email": "athfantest@gmail.com"
     });
-    
+
     // Sabotage the database
     sqlx::query!("ALTER TABLE tokens DROP COLUMN token;",)
-
         .execute(&app.db_pool)
         .await
         .unwrap();
 
     let response = app.add_user(&payload).await;
-    
+
     assert_eq!(response.status().as_u16(), 500);
 }

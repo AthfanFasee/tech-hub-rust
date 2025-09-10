@@ -1,12 +1,12 @@
-use sqlx::{Connection, Executor, PgConnection, PgPool};
-use uuid::Uuid;
-use moodfeed::configuration::{get_config, DatabaseConfigs};
+use moodfeed::configuration::{DatabaseConfigs, get_config};
+use moodfeed::startup::Application;
 use moodfeed::startup::get_connection_pool;
 use moodfeed::telemetry;
-use std::sync::LazyLock;
 use secrecy::Secret;
 use serde_json::Value;
-use moodfeed::startup::Application;
+use sqlx::{Connection, Executor, PgConnection, PgPool};
+use std::sync::LazyLock;
+use uuid::Uuid;
 use wiremock::MockServer;
 
 pub struct TestApp {
@@ -19,18 +19,13 @@ pub struct TestApp {
 // Confirmation links embedded in the request to the email API.
 pub struct ConfirmationLinks {
     pub html: reqwest::Url,
-    pub plain_text: reqwest::Url
+    pub plain_text: reqwest::Url,
 }
 
 impl TestApp {
     /// Extract the confirmation links embedded in the request to the email API.
-    pub fn get_confirmation_links(
-        &self,
-        email_request: &wiremock::Request
-    ) -> ConfirmationLinks {
-        let body: serde_json::Value = serde_json::from_slice(
-            &email_request.body
-        ).unwrap();
+    pub fn get_confirmation_links(&self, email_request: &wiremock::Request) -> ConfirmationLinks {
+        let body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
 
         // Extract the link from one of the request fields.
         let get_link = |s: &str| {
@@ -51,10 +46,7 @@ impl TestApp {
 
         let html = get_link(&body["HtmlBody"].as_str().unwrap());
         let plain_text = get_link(&body["TextBody"].as_str().unwrap());
-        ConfirmationLinks {
-            html,
-            plain_text
-        }
+        ConfirmationLinks { html, plain_text }
     }
 
     pub async fn add_user(&self, payload: &Value) -> reqwest::Response {
@@ -75,22 +67,15 @@ static TRACING: LazyLock<()> = LazyLock::new(|| {
 
     // If TEST_LOG env variable is set then output the logs to std out while running tests. Otherwise skip
     if std::env::var("TEST_LOG").is_ok() {
-        let subscriber = telemetry::get_subscriber(
-            subscriber_name,
-            default_filter_level,
-            std::io::stdout
-        );
+        let subscriber =
+            telemetry::get_subscriber(subscriber_name, default_filter_level, std::io::stdout);
         telemetry::init_subscriber(subscriber);
     } else {
-        let subscriber = telemetry::get_subscriber(
-            subscriber_name,
-            default_filter_level,
-            std::io::sink
-        );
+        let subscriber =
+            telemetry::get_subscriber(subscriber_name, default_filter_level, std::io::sink);
         telemetry::init_subscriber(subscriber);
     };
 });
-
 
 pub async fn spawn_app() -> TestApp {
     // The first time `initialize` is invoked the code in `TRACING` is executed.
@@ -98,7 +83,6 @@ pub async fn spawn_app() -> TestApp {
     LazyLock::force(&TRACING);
 
     let email_server = MockServer::start().await;
-
 
     // Randomise configuration to ensure test isolation
     let configuration = {
@@ -137,9 +121,7 @@ async fn configure_database(config: &DatabaseConfigs) -> PgPool {
         password: Secret::new("password".to_string()),
         ..config.clone()
     };
-    let mut connection = PgConnection::connect_with(
-        &maintenance_settings.connect_options()
-    )
+    let mut connection = PgConnection::connect_with(&maintenance_settings.connect_options())
         .await
         .expect("Failed to connect to Postgres");
 

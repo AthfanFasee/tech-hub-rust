@@ -1,6 +1,6 @@
-mod user_name;
-mod user_email;
 mod new_user;
-pub use user_name::UserName;
-pub use user_email::UserEmail;
+mod user_email;
+mod user_name;
 pub use new_user::NewUser;
+pub use user_email::UserEmail;
+pub use user_name::UserName;

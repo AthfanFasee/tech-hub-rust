@@ -1,5 +1,5 @@
-use moodfeed::startup::Application;
 use moodfeed::configuration;
+use moodfeed::startup::Application;
 use moodfeed::telemetry;
 
 #[tokio::main]

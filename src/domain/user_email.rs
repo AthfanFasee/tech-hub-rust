@@ -4,12 +4,12 @@ use validator::ValidateEmail;
 pub struct UserEmail(String);
 impl UserEmail {
     pub fn parse(s: String) -> Result<UserEmail, String> {
-       // ValidateEmail trait is implemented for String
+        // ValidateEmail trait is implemented for String
         if s.validate_email() {
-           Ok(UserEmail(s))
-       } else {
-           Err(format!("Email is invalid: {s}"))
-       }
+            Ok(UserEmail(s))
+        } else {
+            Err(format!("Email is invalid: {s}"))
+        }
     }
 }
 impl AsRef<str> for UserEmail {
@@ -22,10 +22,10 @@ impl AsRef<str> for UserEmail {
 mod tests {
     use super::UserEmail;
     use claims::assert_err;
-    use fake::faker::internet::en::SafeEmail;
     use fake::Fake;
-    use rand::rngs::StdRng;
+    use fake::faker::internet::en::SafeEmail;
     use rand::SeedableRng;
+    use rand::rngs::StdRng;
 
     #[test]
     fn empty_string_is_rejected() {

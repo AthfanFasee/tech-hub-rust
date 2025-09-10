@@ -25,6 +25,18 @@ pub enum EmailError {
     Url(url::ParseError),
 }
 
+impl std::error::Error for EmailError {}
+
+impl std::fmt::Display for EmailError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "An error was encountered while \
+            trying to send email."
+        )
+    }
+}
+
 impl From<reqwest::Error> for EmailError {
     fn from(err: reqwest::Error) -> Self {
         EmailError::Request(err)
@@ -42,18 +54,15 @@ impl EmailClient {
         base_url: Url,
         sender: UserEmail,
         authorization_token: Secret<String>,
-        timeout: std::time::Duration
+        timeout: std::time::Duration,
     ) -> Self {
-        let http_client = Client::builder()
-            .timeout(timeout)
-            .build()
-            .unwrap();
+        let http_client = Client::builder().timeout(timeout).build().unwrap();
 
         Self {
             http_client,
             base_url,
             sender,
-            authorization_token
+            authorization_token,
         }
     }
     pub async fn send_email(
@@ -61,11 +70,9 @@ impl EmailClient {
         recipient: UserEmail,
         subject: &str,
         html_content: &str,
-        text_content: &str
+        text_content: &str,
     ) -> Result<(), EmailError> {
-        let url = self
-            .base_url
-            .join("/email")?;
+        let url = self.base_url.join("/email")?;
 
         let request_body = SendEmailRequest {
             from: self.sender.as_ref(),
@@ -74,12 +81,12 @@ impl EmailClient {
             html_body: html_content,
             text_body: text_content,
         };
-        
+
         self.http_client
             .post(url)
             .header(
                 "X-Postmark-Server-Token",
-                self.authorization_token.expose_secret()
+                self.authorization_token.expose_secret(),
             )
             .json(&request_body)
             .send()
@@ -94,21 +101,20 @@ impl EmailClient {
 mod tests {
     use crate::domain::UserEmail;
     use crate::email_client::EmailClient;
+    use claims::{assert_err, assert_ok};
     use fake::faker::internet::en::SafeEmail;
     use fake::faker::lorem::en::{Paragraph, Sentence};
     use fake::{Fake, Faker};
-    use wiremock::matchers::{header, header_exists, path, method, any};
-    use wiremock::{Mock, MockServer, ResponseTemplate, Request, Match};
     use reqwest::Url;
     use secrecy::Secret;
-    use claims::{assert_err, assert_ok};
+    use wiremock::matchers::{any, header, header_exists, method, path};
+    use wiremock::{Match, Mock, MockServer, Request, ResponseTemplate};
 
     struct SendEmailBodyMatcher;
 
     impl Match for SendEmailBodyMatcher {
         fn matches(&self, request: &Request) -> bool {
-            let result: Result<serde_json::Value, _> =
-            serde_json::from_slice(&request.body);
+            let result: Result<serde_json::Value, _> = serde_json::from_slice(&request.body);
 
             if let Ok(body) = result {
                 body.get("From").is_some()
@@ -138,7 +144,7 @@ mod tests {
             .mount(&mock_server)
             .await;
 
-        let _  = email_client
+        let _ = email_client
             .send_email(email(), &subject(), &content(), &content())
             .await;
     }
@@ -184,8 +190,7 @@ mod tests {
         let mock_server = MockServer::start().await;
         let email_client = email_client(mock_server.uri());
 
-        let response = ResponseTemplate::new(200)
-            .set_delay(std::time::Duration::from_secs(10));
+        let response = ResponseTemplate::new(200).set_delay(std::time::Duration::from_secs(10));
 
         Mock::given(any())
             .respond_with(response)

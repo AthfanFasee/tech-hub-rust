@@ -1,8 +1,8 @@
-use serde;
+use crate::domain::UserEmail;
 use secrecy::{ExposeSecret, Secret};
+use serde;
 use sqlx::postgres::PgConnectOptions;
 use sqlx::postgres::PgSslMode;
-use crate::domain::UserEmail;
 
 #[derive(serde::Deserialize, Clone)]
 pub struct EmailClientSettings {
@@ -20,9 +20,7 @@ impl EmailClientSettings {
     pub fn timeout(&self) -> std::time::Duration {
         std::time::Duration::from_millis(self.timeout_milliseconds)
     }
-
 }
-
 
 #[derive(serde::Deserialize, Clone)]
 pub struct Configuration {
@@ -45,7 +43,7 @@ pub struct DatabaseConfigs {
 pub struct ApplicationSettings {
     pub port: u16,
     pub host: String,
-    pub base_url: String
+    pub base_url: String,
 }
 
 pub fn get_config() -> Result<Configuration, config::ConfigError> {
@@ -62,12 +60,10 @@ pub fn get_config() -> Result<Configuration, config::ConfigError> {
     let environment_filename = format!("{}.yaml", environment.as_str());
     // initialise config reader
     let configs = config::Config::builder()
-        .add_source(
-            config::File::from(config_directory.join("base.yaml"))
-        )
-        .add_source(
-            config::File::from(config_directory.join(environment_filename))
-        )
+        .add_source(config::File::from(config_directory.join("base.yaml")))
+        .add_source(config::File::from(
+            config_directory.join(environment_filename),
+        ))
         .build()?;
 
     // convert the config values to config type
@@ -94,7 +90,9 @@ impl TryFrom<String> for Environment {
         match s.to_lowercase().as_str() {
             "local" => Ok(Self::Local),
             "production" => Ok(Self::Production),
-            other => Err(format!("Unknown environment: {other}. Use either `local` or `production`")),
+            other => Err(format!(
+                "Unknown environment: {other}. Use either `local` or `production`"
+            )),
         }
     }
 }
@@ -115,5 +113,4 @@ impl DatabaseConfigs {
             .ssl_mode(ssl_mode)
             .database(&self.database_name)
     }
-
 }
