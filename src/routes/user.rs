@@ -2,12 +2,12 @@ use crate::domain::{NewUser, UserEmail, UserName};
 use crate::email_client::EmailClient;
 use crate::email_client::EmailError;
 use crate::startup::ApplicationBaseUrl;
-use actix_web::http::StatusCode;
 use actix_web::ResponseError;
-use actix_web::{web, HttpResponse};
+use actix_web::http::StatusCode;
+use actix_web::{HttpResponse, web};
 use anyhow::Context;
 use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
+use rand::{Rng, thread_rng};
 use serde::Deserialize;
 use serde::Serialize;
 use sqlx::{Executor, PgPool, Postgres, Transaction};
@@ -39,9 +39,6 @@ pub enum UserError {
     #[error("{0}")]
     ValidationError(String),
 
-    #[error("Requested record not found")]
-    NotFound,
-
     #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),
 }
@@ -56,7 +53,6 @@ impl ResponseError for UserError {
     fn status_code(&self) -> StatusCode {
         match self {
             UserError::ValidationError(_) => StatusCode::BAD_REQUEST,
-            UserError::NotFound => StatusCode::NOT_FOUND,
             UserError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -71,16 +67,6 @@ impl ResponseError for UserError {
     }
 }
 
-impl From<sqlx::Error> for UserError {
-    fn from(e: sqlx::Error) -> Self {
-        match e {
-            sqlx::Error::RowNotFound => UserError::NotFound,
-            other => UserError::UnexpectedError(other.into()),
-        }
-    }
-}
-
-
 #[derive(Serialize)]
 struct ErrorResponse {
     code: u16,
@@ -92,7 +78,6 @@ struct SuccessResponse {
     code: u16,
     message: String,
 }
-
 
 #[derive(Deserialize)]
 pub struct UserData {
@@ -212,7 +197,7 @@ pub async fn send_confirmation_email(
 ) -> Result<(), EmailError> {
     let confirmation_link = format!("{base_url}/user/confirm?token={token}");
     let plain_body =
-        format!("Welcome to Moodfeed!\nVisit {confirmation_link} to confirm your subscription.", );
+        format!("Welcome to Moodfeed!\nVisit {confirmation_link} to confirm your subscription.",);
     let html_body = format!(
         "Welcome to Moodfeed!<br />\
         Click <a href=\"{confirmation_link}\">here</a> to confirm your subscription.",
