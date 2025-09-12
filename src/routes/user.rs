@@ -12,24 +12,6 @@ use serde::Deserialize;
 use sqlx::{Executor, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
-#[derive(Deserialize)]
-pub struct UserData {
-    email: String,
-    name: String,
-}
-
-// This is like saying - I know how to build myself `NewUser` from something else `UserData`
-// Then Rust lets us use `.try_into` whenever there's a `UserData` - where it automatically tries converting it to a `NewUser`
-impl TryFrom<UserData> for NewUser {
-    type Error = String;
-
-    fn try_from(payload: UserData) -> Result<Self, Self::Error> {
-        let name = UserName::parse(payload.name)?;
-        let email = UserEmail::parse(payload.email)?;
-        Ok(Self { name, email })
-    }
-}
-
 pub fn error_chain_fmt(
     e: &(dyn std::error::Error),
     f: &mut std::fmt::Formatter<'_>,
@@ -75,6 +57,23 @@ impl ResponseError for UserError {
     }
 }
 
+#[derive(Deserialize)]
+pub struct UserData {
+    email: String,
+    name: String,
+}
+
+// This is like saying - I know how to build myself `NewUser` from something else `UserData`
+// Then Rust lets us use `.try_into` whenever there's a `UserData` - where it automatically tries converting it to a `NewUser`
+impl TryFrom<UserData> for NewUser {
+    type Error = String;
+
+    fn try_from(payload: UserData) -> Result<Self, Self::Error> {
+        let name = UserName::parse(payload.name)?;
+        let email = UserEmail::parse(payload.email)?;
+        Ok(Self { name, email })
+    }
+}
 #[tracing::instrument(
     name = "Add a new user",
     skip(pool, payload, email_client, base_url),
@@ -98,13 +97,13 @@ pub async fn add_user(
 
     let user_id = insert_user(&new_user, &mut transaction)
         .await
-        .context("Failed to insert new user in the database")?;
+        .context("Failed to insert new user")?;
 
     let activation_token = generate_token();
 
     store_activation_token(&mut transaction, user_id, &activation_token)
         .await
-        .context("Failed to store the confirmation token for new user")?;
+        .context("Failed to store the user activation token")?;
 
     transaction
         .commit()
@@ -113,7 +112,7 @@ pub async fn add_user(
 
     send_confirmation_email(&email_client, new_user, &base_url.0, &activation_token)
         .await
-        .context("Failed to send a confirmation email when registering new user")?;
+        .context("Failed to send a user activation email")?;
 
     Ok(HttpResponse::Ok().finish())
 }
