@@ -18,8 +18,8 @@ pub struct UserData {
     name: String,
 }
 
-// This is like saying - I know how to build myself (NewUser) from something else (UserData)
-// Then Rust lets us use `.try_into` whenever there's a UserData (where it automatically tries converting it to a NewUser)
+// This is like saying - I know how to build myself `NewUser` from something else `UserData`
+// Then Rust lets us use `.try_into` whenever there's a `UserData` - where it automatically tries converting it to a `NewUser`
 impl TryFrom<UserData> for NewUser {
     type Error = String;
 
@@ -35,7 +35,7 @@ pub fn error_chain_fmt(
     f: &mut std::fmt::Formatter<'_>,
 ) -> std::fmt::Result {
     // Top-level: use Display to avoid recursion
-    writeln!(f, "{e}\n")?;
+    writeln!(f, "{e}")?;
 
     let mut current = e.source();
     while let Some(cause) = current {
