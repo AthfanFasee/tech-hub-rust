@@ -1,10 +1,10 @@
 use crate::domain::UserEmail;
 use crate::email_client::EmailClient;
-use crate::routes::error_chain_fmt;
 use crate::routes::ErrorResponse;
+use crate::routes::error_chain_fmt;
 use actix_web::http::header::{HeaderMap, HeaderValue};
-use actix_web::http::{header, StatusCode};
-use actix_web::{web, HttpRequest, HttpResponse, ResponseError};
+use actix_web::http::{StatusCode, header};
+use actix_web::{HttpRequest, HttpResponse, ResponseError, web};
 use anyhow::Context;
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use base64::Engine;
@@ -135,8 +135,8 @@ async fn get_activated_users(
         WHERE is_activated = true
         "#,
     )
-        .fetch_all(pool)
-        .await?;
+    .fetch_all(pool)
+    .await?;
     let confirmed_users = rows
         .into_iter()
         .map(|r| match UserEmail::parse(r.email) {
@@ -185,15 +185,10 @@ async fn validate_credentials(
     credentials: Credentials,
     pool: &PgPool,
 ) -> Result<uuid::Uuid, PublishError> {
-    let (user_id, expected_password_hash) = get_stored_credentials(
-        &credentials.username,
-        pool,
-    )
+    let (user_id, expected_password_hash) = get_stored_credentials(&credentials.username, pool)
         .await
         .map_err(PublishError::UnexpectedError)?
-        .ok_or_else(|| {
-            PublishError::AuthError(anyhow::anyhow!("Unknown username."))
-        })?;
+        .ok_or_else(|| PublishError::AuthError(anyhow::anyhow!("Unknown username.")))?;
 
     let expected_password_hash = PasswordHash::new(expected_password_hash.expose_secret())
         .context("Failed to parse hash in PHC string format.")
@@ -208,23 +203,22 @@ async fn validate_credentials(
     Ok(user_id)
 }
 
-
 #[tracing::instrument(name = "Get stored credentials", skip(pool))]
 async fn get_stored_credentials(
     username: &str,
     pool: &PgPool,
 ) -> Result<Option<(uuid::Uuid, Secret<String>)>, anyhow::Error> {
     let row = sqlx::query!(
-    r#"
+        r#"
     SELECT id, password_hash
     FROM users
     WHERE name = $1
     "#,
-    username,
+        username,
     )
-        .fetch_optional(pool)
-        .await
-        .context("Failed to perform a query to retrieve stored credentials.")?
-        .map(|row| (row.id, Secret::new(row.password_hash)));
+    .fetch_optional(pool)
+    .await
+    .context("Failed to perform a query to retrieve stored credentials.")?
+    .map(|row| (row.id, Secret::new(row.password_hash)));
     Ok(row)
 }
