@@ -40,6 +40,8 @@ url = "2.0"
 rand = { version = "0.8", features = ["std_rng"] }
 thiserror = "2.0.16"
 anyhow = "1"
+argon2 = { version = "0.5", features = ["std"] }
+base64 = "0.22.1"
 
 
 [dev-dependencies]

@@ -92,7 +92,6 @@ async fn create_activated_user(app: &TestApp) {
 
 #[tokio::test]
 async fn newsletters_returns_400_for_invalid_data() {
-    // Arrange
     let app = spawn_app().await;
     let test_cases = vec![
         (
@@ -109,13 +108,35 @@ async fn newsletters_returns_400_for_invalid_data() {
             "missing content",
         ),
     ];
-    for (invalid_body, error_message) in test_cases {
+    for (invalid_body, _error_message) in test_cases {
         let response = app.post_newsletters(invalid_body).await;
 
         assert_eq!(
             400,
             response.status().as_u16(),
-            "The API did not fail with 400 Bad Request when the payload was {error_message}."
+            "The API did not fail with 400 Bad Request when the payload was {_error_message}."
         );
     }
+}
+
+#[tokio::test]
+async fn requests_missing_authorization_are_rejected() {
+    let app = spawn_app().await;
+
+    let newsletter_request_body = serde_json::json!({
+    "title": "Newsletter title",
+    "content": {
+    "text": "Newsletter body as plain text",
+    "html": "<p>Newsletter body as HTML</p>",
+    }
+    });
+    let response = app
+        .post_newsletters_unauthorized(newsletter_request_body)
+        .await;
+
+    assert_eq!(401, response.status().as_u16());
+    assert_eq!(
+        r#"Basic realm="publish""#,
+        response.headers()["WWW-Authenticate"]
+    );
 }

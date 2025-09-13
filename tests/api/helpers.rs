@@ -1,3 +1,5 @@
+use argon2::password_hash::SaltString;
+use argon2::{Argon2, PasswordHasher};
 use moodfeed::configuration::{DatabaseConfigs, get_config};
 use moodfeed::startup::Application;
 use moodfeed::startup::get_connection_pool;
@@ -9,11 +11,51 @@ use std::sync::LazyLock;
 use uuid::Uuid;
 use wiremock::MockServer;
 
+pub struct TestUser {
+    pub user_id: Uuid,
+    pub username: String,
+    pub password: String,
+    pub email: String,
+}
+
+impl TestUser {
+    pub fn generate() -> Self {
+        Self {
+            user_id: Uuid::new_v4(),
+            username: "athfantest".to_string(),
+            password: Uuid::new_v4().to_string(),
+            email: "athfantest@gmail.com".to_string(),
+        }
+    }
+
+    async fn store(&self, pool: &PgPool) {
+        let salt = SaltString::generate(&mut rand::thread_rng());
+
+        let password_hash = Argon2::default()
+            .hash_password(self.password.as_bytes(), &salt)
+            .unwrap()
+            .to_string();
+
+        sqlx::query!(
+            "INSERT INTO users (id, name, password_hash, email)
+            VALUES ($1, $2, $3, $4)",
+            self.user_id,
+            self.username,
+            password_hash,
+            self.email
+        )
+        .execute(pool)
+        .await
+        .expect("Failed to store test user");
+    }
+}
+
 pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,
     pub email_server: MockServer,
     pub port: u16,
+    pub test_user: TestUser,
 }
 
 // Confirmation links embedded in the request to the email API.
@@ -25,7 +67,7 @@ pub struct ConfirmationLinks {
 impl TestApp {
     /// Extract the confirmation links embedded in the request to the email API.
     pub fn get_confirmation_links(&self, email_request: &wiremock::Request) -> ConfirmationLinks {
-        let body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
+        let body: Value = serde_json::from_slice(&email_request.body).unwrap();
 
         // Extract the link from one of the request fields.
         let get_link = |s: &str| {
@@ -56,10 +98,19 @@ impl TestApp {
             .json(payload)
             .send()
             .await
-            .expect("Failed to execute request: add_user.")
+            .expect("Failed to execute request: add_user")
     }
 
-    pub async fn post_newsletters(&self, body: serde_json::Value) -> reqwest::Response {
+    pub async fn post_newsletters(&self, body: Value) -> reqwest::Response {
+        reqwest::Client::new()
+            .post(&format!("{}/newsletters", &self.address))
+            .basic_auth(&self.test_user.username, Some(&self.test_user.password))
+            .json(&body)
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
+    pub async fn post_newsletters_unauthorized(&self, body: Value) -> reqwest::Response {
         reqwest::Client::new()
             .post(&format!("{}/newsletters", &self.address))
             .json(&body)
@@ -114,12 +165,16 @@ pub async fn spawn_app() -> TestApp {
     let application_port = application.port();
     let _ = tokio::spawn(application.run_until_stopped());
 
-    TestApp {
+    let test_app = TestApp {
         address: format!("http://localhost:{}", application_port),
         port: application_port,
         db_pool: get_connection_pool(&configuration.database),
         email_server,
-    }
+        test_user: TestUser::generate(),
+    };
+
+    test_app.test_user.store(&test_app.db_pool).await;
+    test_app
 }
 
 async fn configure_database(config: &DatabaseConfigs) -> PgPool {

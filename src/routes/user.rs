@@ -50,27 +50,25 @@ impl std::fmt::Debug for UserError {
 }
 
 impl ResponseError for UserError {
-    fn status_code(&self) -> StatusCode {
-        match self {
+    fn error_response(&self) -> HttpResponse {
+        let status_code = match self {
             UserError::ValidationError(_) => StatusCode::BAD_REQUEST,
             UserError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-        }
-    }
+        };
 
-    fn error_response(&self) -> HttpResponse {
         let error_response = ErrorResponse {
-            code: self.status_code().as_u16(),
+            code: status_code.as_u16(),
             message: self.to_string(),
         };
 
-        HttpResponse::build(self.status_code()).json(error_response)
+        HttpResponse::build(status_code).json(error_response)
     }
 }
 
 #[derive(Serialize)]
-struct ErrorResponse {
-    code: u16,
-    message: String,
+pub struct ErrorResponse {
+    pub code: u16,
+    pub message: String,
 }
 
 #[derive(Serialize)]

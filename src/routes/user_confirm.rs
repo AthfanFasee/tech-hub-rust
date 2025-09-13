@@ -1,3 +1,4 @@
+use crate::routes::ErrorResponse;
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, ResponseError, web};
 use anyhow::Context;
@@ -25,13 +26,21 @@ impl std::fmt::Debug for UserConfirmError {
 }
 
 impl ResponseError for UserConfirmError {
-    fn status_code(&self) -> StatusCode {
-        match self {
+    fn error_response(&self) -> HttpResponse {
+        let status_code = match self {
             UserConfirmError::UnknownToken => StatusCode::UNAUTHORIZED,
             UserConfirmError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-        }
+        };
+
+        let error_response = ErrorResponse {
+            code: status_code.as_u16(),
+            message: self.to_string(),
+        };
+
+        HttpResponse::build(status_code).json(error_response)
     }
 }
+
 #[tracing::instrument(name = "Confirm a pending user activation", skip(parameters, pool))]
 
 pub async fn user_confirm(
@@ -43,23 +52,41 @@ pub async fn user_confirm(
         .context("Failed to retrieve the user id associated with the provided token.")?
         .ok_or(UserConfirmError::UnknownToken)?;
 
-    activate_user(&pool, user_id)
+    activate_user_and_delete_token(&pool, user_id, &parameters.token)
         .await
         .context("Failed to update the user status as activated")?;
 
     Ok(HttpResponse::Ok().finish())
 }
 
-#[tracing::instrument(name = "Mark user as activated", skip(user_id, pool))]
-pub async fn activate_user(pool: &PgPool, user_id: Uuid) -> Result<(), sqlx::Error> {
+#[tracing::instrument(
+    name = "Mark user as activated and delete token",
+    skip(user_id, pool, token)
+)]
+pub async fn activate_user_and_delete_token(
+    pool: &PgPool,
+    user_id: Uuid,
+    token: &str,
+) -> Result<(), sqlx::Error> {
     sqlx::query!(
-        r#"UPDATE users SET is_activated = true WHERE id = $1"#,
+        r#"
+        WITH activate_user AS (
+            UPDATE users
+            SET is_activated = true
+            WHERE id = $1
+        )
+        DELETE FROM tokens
+        WHERE token = $2 AND user_id = $1 AND is_activation = true
+        "#,
         user_id,
+        token,
     )
     .execute(pool)
     .await?;
+
     Ok(())
 }
+
 #[tracing::instrument(name = "Get user_id from token", skip(token, pool))]
 pub async fn get_user_id_from_token(
     pool: &PgPool,
