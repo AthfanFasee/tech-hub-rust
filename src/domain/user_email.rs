@@ -2,9 +2,10 @@ use validator::ValidateEmail;
 
 #[derive(Debug)]
 pub struct UserEmail(String);
+
 impl UserEmail {
     pub fn parse(s: String) -> Result<UserEmail, String> {
-        // ValidateEmail trait is implemented for String
+        // ValidateEmail trait is implemented for String hence it's possible to use `validate_email` on it
         if s.validate_email() {
             Ok(UserEmail(s))
         } else {
@@ -12,9 +13,17 @@ impl UserEmail {
         }
     }
 }
+
 impl AsRef<str> for UserEmail {
     fn as_ref(&self) -> &str {
         &self.0
+    }
+}
+
+impl std::fmt::Display for UserEmail {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Forward to the Display implementation of the wrapped String.
+        self.0.fmt(f)
     }
 }
 
