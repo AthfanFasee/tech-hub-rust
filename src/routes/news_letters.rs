@@ -1,10 +1,10 @@
 use crate::domain::UserEmail;
 use crate::email_client::EmailClient;
 use crate::routes::error_chain_fmt;
-use actix_web::HttpResponse;
-use actix_web::ResponseError;
 use actix_web::http::StatusCode;
 use actix_web::web;
+use actix_web::HttpResponse;
+use actix_web::ResponseError;
 use anyhow::Context;
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -64,7 +64,7 @@ pub async fn publish_newsletter(
                     // Create a structured log field called error.cause_chain.
                     // Format the variable error with Debug ({:?}), which for anyhow::Error prints the error and its cause chain.
                     error.cause_chain = ?error,
-                    "Skipping a confirmed subscriber. \
+                    "Skipping a confirmed user. \
                     Their stored contact details are invalid",
                 );
             }
@@ -88,8 +88,8 @@ async fn get_activated_users(
         WHERE is_activated = true
         "#,
     )
-    .fetch_all(pool)
-    .await?;
+        .fetch_all(pool)
+        .await?;
     let confirmed_users = rows
         .into_iter()
         .map(|r| match UserEmail::parse(r.email) {
