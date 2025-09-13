@@ -1,4 +1,4 @@
-use crate::helpers::spawn_app;
+use crate::helpers::{TestUser, spawn_app};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
 
@@ -26,9 +26,10 @@ async fn add_user_returns_a_200_for_valid_json_data() {
 async fn add_user_persists_the_new_user() {
     let app = spawn_app().await;
 
+    let user = TestUser::generate();
     let payload = serde_json::json!({
-        "name": "athfantest",
-        "email": "athfantest@gmail.com"
+        "name": user.username,
+        "email": user.email
     });
 
     Mock::given(path("/email"))
@@ -39,13 +40,20 @@ async fn add_user_persists_the_new_user() {
 
     app.add_user(&payload).await;
 
-    let saved = sqlx::query!("SELECT email, name, is_activated, is_subscribed FROM users",)
-        .fetch_one(&app.db_pool)
-        .await
-        .expect("Failed to fetch saved user data.");
+    let saved = sqlx::query!(
+        r#"
+        SELECT email, name, is_activated, is_subscribed 
+        FROM users
+        WHERE email = $1
+        "#,
+        user.email,
+    )
+    .fetch_one(&app.db_pool)
+    .await
+    .expect("Failed to fetch saved user data.");
 
-    assert_eq!(saved.email, "athfantest@gmail.com");
-    assert_eq!(saved.name, "athfantest");
+    assert_eq!(saved.email, user.email);
+    assert_eq!(saved.name, user.username);
     assert!(!saved.is_activated);
     assert!(!saved.is_subscribed);
 }

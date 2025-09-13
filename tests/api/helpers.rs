@@ -20,11 +20,12 @@ pub struct TestUser {
 
 impl TestUser {
     pub fn generate() -> Self {
+        let random_uuid = Uuid::new_v4().to_string();
         Self {
             user_id: Uuid::new_v4(),
-            username: "athfantest".to_string(),
+            username: Uuid::new_v4().to_string(),
             password: Uuid::new_v4().to_string(),
-            email: "athfantest@gmail.com".to_string(),
+            email: format!("{}@gmail.com", random_uuid),
         }
     }
 
