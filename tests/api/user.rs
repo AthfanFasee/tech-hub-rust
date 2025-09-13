@@ -119,9 +119,10 @@ async fn add_user_returns_a_400_when_data_is_present_but_invalid() {
 #[tokio::test]
 async fn add_user_sends_a_confirmation_email_for_valid_data() {
     let app = spawn_app().await;
+    let user = TestUser::generate();
     let payload = serde_json::json!({
-        "name": "athfantest",
-        "email": "athfantest@gmail.com"
+        "name": user.username,
+        "email": user.email
     });
 
     Mock::given(path("/email"))
@@ -137,9 +138,10 @@ async fn add_user_sends_a_confirmation_email_for_valid_data() {
 #[tokio::test]
 async fn add_user_sends_a_confirmation_email_with_a_link() {
     let app = spawn_app().await;
+    let user = TestUser::generate();
     let payload = serde_json::json!({
-        "name": "athfantest",
-        "email": "athfantest@gmail.com"
+        "name": user.username,
+        "email": user.email
     });
 
     Mock::given(path("/email"))
@@ -161,9 +163,10 @@ async fn add_user_sends_a_confirmation_email_with_a_link() {
 #[tokio::test]
 async fn add_user_fails_if_there_is_a_fatal_database_error() {
     let app = spawn_app().await;
+    let user = TestUser::generate();
     let payload = serde_json::json!({
-        "name": "athfantest",
-        "email": "athfantest@gmail.com"
+        "name": user.username,
+        "email": user.email
     });
 
     // Sabotage the database

@@ -1,4 +1,4 @@
-use crate::helpers::{ConfirmationLinks, TestApp, spawn_app};
+use crate::helpers::{ConfirmationLinks, TestApp, TestUser, spawn_app};
 use wiremock::matchers::{any, method, path};
 use wiremock::{Mock, ResponseTemplate};
 
@@ -53,9 +53,10 @@ async fn newsletters_are_delivered_to_confirmed_users() {
 }
 
 async fn create_inactivated_user(app: &TestApp) -> ConfirmationLinks {
+    let user = TestUser::generate();
     let payload = serde_json::json!({
-        "name": "athfantest",
-        "email": "athfantest@gmail.com"
+        "name": user.username,
+        "email": user.email
     });
 
     let _mock_guard = Mock::given(path("/email"))

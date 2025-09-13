@@ -5,9 +5,10 @@ use wiremock::{Mock, ResponseTemplate};
 #[tokio::test]
 async fn the_link_returned_by_add_user_returns_a_200_if_called() {
     let app = spawn_app().await;
+    let user = TestUser::generate();
     let payload = serde_json::json!({
-        "name": "athfantest",
-        "email": "athfantest@gmail.com"
+        "name": user.username,
+        "email": user.email
     });
 
     Mock::given(path("/email"))
