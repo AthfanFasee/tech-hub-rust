@@ -1490,40 +1490,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "moodfeed"
-version = "0.1.0"
-dependencies = [
- "actix-web",
- "anyhow",
- "argon2",
- "base64",
- "claims",
- "config",
- "fake",
- "linkify",
- "quickcheck",
- "quickcheck_macros",
- "rand 0.8.5",
- "reqwest",
- "secrecy",
- "serde",
- "serde_json",
- "sqlx",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-actix-web",
- "tracing-bunyan-formatter",
- "tracing-log 0.2.0",
- "tracing-subscriber",
- "unicode-segmentation",
- "url",
- "uuid",
- "validator",
- "wiremock",
-]
-
-[[package]]
 name = "mutually_exclusive_features"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2527,6 +2493,40 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "techhub"
+version = "0.1.0"
+dependencies = [
+ "actix-web",
+ "anyhow",
+ "argon2",
+ "base64",
+ "claims",
+ "config",
+ "fake",
+ "linkify",
+ "quickcheck",
+ "quickcheck_macros",
+ "rand 0.8.5",
+ "reqwest",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-actix-web",
+ "tracing-bunyan-formatter",
+ "tracing-log 0.2.0",
+ "tracing-subscriber",
+ "unicode-segmentation",
+ "url",
+ "uuid",
+ "validator",
+ "wiremock",
 ]
 
 [[package]]

@@ -5,7 +5,7 @@ database:
   port: 5432
   username: "postgres"
   password: "password"
-  database_name: "moodfeed"
+  database_name: "techhub"
 email_client:
   base_url: "http://localhost"
   sender_email: "athfantest@gmail.com"

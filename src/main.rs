@@ -1,6 +1,6 @@
-use moodfeed::configuration;
-use moodfeed::startup::Application;
-use moodfeed::telemetry;
+use techhub::configuration;
+use techhub::startup::Application;
+use techhub::telemetry;
 
 #[tokio::main]
 async fn main() {
@@ -10,7 +10,7 @@ async fn main() {
 }
 
 async fn try_main() -> Result<(), std::io::Error> {
-    let subscriber = telemetry::get_subscriber("moodfeed".into(), "info".into(), std::io::stdout);
+    let subscriber = telemetry::get_subscriber("techhub".into(), "info".into(), std::io::stdout);
     telemetry::init_subscriber(subscriber);
     let config = configuration::get_config().expect("Failed to read config");
     let application = Application::build(config).await?;

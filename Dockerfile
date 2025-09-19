@@ -16,7 +16,7 @@ RUN apt-get update -y \
 && apt-get autoremove -y \
 && apt-get clean -y \
 && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /app/target/release/moodfeed moodfeed
+COPY --from=builder /app/target/release/techhub techhub
 COPY configuration configuration
 ENV APP_ENVIRONMENT production
-ENTRYPOINT ["./moodfeed"]
+ENTRYPOINT ["./techhub"]

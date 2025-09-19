@@ -16,7 +16,7 @@ SUPERUSER="${SUPERUSER:=postgres}"
 SUPERUSER_PWD="${SUPERUSER_PWD:=password}"
 APP_USER="${APP_USER:=app}"
 APP_USER_PWD="${APP_USER_PWD:=secret}"
-APP_DB_NAME="${APP_DB_NAME:=moodfeed}"
+APP_DB_NAME="${APP_DB_NAME:=techhub}"
 
 # Allow to skip Docker if a dockerized Postgres database is already running
 if [[ -z "${SKIP_DOCKER}" ]]
@@ -28,7 +28,7 @@ then
     echo >&2 "    docker kill ${RUNNING_POSTGRES_CONTAINER}"
     exit 1
   fi
-  CONTAINER_NAME="moodfeed_postgres"
+  CONTAINER_NAME="techhub_postgres"
   # Launch postgres using Docker
   docker run \
       --env POSTGRES_USER=${SUPERUSER} \

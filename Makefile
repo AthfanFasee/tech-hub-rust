@@ -44,7 +44,7 @@ migrate:
 # Migrate new: delete existing container and re-init db
 migrate-new:
 	@echo "Stopping and removing existing postgres container..."
-	-docker rm -f moodfeed_postgres || true
+	-docker rm -f techhub_postgres || true
 	@echo "Re-initializing db container and running migrations..."
 	./scripts/init_db.sh
 	@echo "Running cargo sqlx prepare..."

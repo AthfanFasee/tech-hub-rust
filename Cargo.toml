@@ -1,5 +1,5 @@
 [package]
-name = "moodfeed"
+name = "techhub"
 version = "0.1.0"
 authors = ["Athfan Fasee <aththaar47@gmail.com>"]
 edition = "2024"
@@ -9,7 +9,7 @@ path = "src/lib.rs"
 
 [[bin]]
 path = "src/main.rs"
-name = "moodfeed"
+name = "techhub"
 
 [dependencies]
 actix-web = "4"

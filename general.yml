@@ -1,8 +1,8 @@
 # The name of your workflow. GitHub displays the names of your workflows on your repository's "Actions" tab
-name: moodfeed
+name: techhub
 
 # To automatically trigger the workflow
-on: [push, pull_request]
+on: [ push, pull_request ]
 
 env:
   CARGO_TERM_COLOR: always

@@ -2,12 +2,12 @@ use crate::domain::{NewUser, UserEmail, UserName};
 use crate::email_client::EmailClient;
 use crate::email_client::EmailError;
 use crate::startup::ApplicationBaseUrl;
-use actix_web::ResponseError;
 use actix_web::http::StatusCode;
-use actix_web::{HttpResponse, web};
+use actix_web::ResponseError;
+use actix_web::{web, HttpResponse};
 use anyhow::Context;
 use rand::distributions::Alphanumeric;
-use rand::{Rng, thread_rng};
+use rand::{thread_rng, Rng};
 use serde::Deserialize;
 use serde::Serialize;
 use sqlx::{Executor, PgPool, Postgres, Transaction};
@@ -195,9 +195,9 @@ pub async fn send_confirmation_email(
 ) -> Result<(), EmailError> {
     let confirmation_link = format!("{base_url}/user/confirm?token={token}");
     let plain_body =
-        format!("Welcome to Moodfeed!\nVisit {confirmation_link} to confirm your subscription.",);
+        format!("Welcome to TechHub!\nVisit {confirmation_link} to confirm your subscription.", );
     let html_body = format!(
-        "Welcome to Moodfeed!<br />\
+        "Welcome to TechHub!<br />\
         Click <a href=\"{confirmation_link}\">here</a> to confirm your subscription.",
     );
     email_client
