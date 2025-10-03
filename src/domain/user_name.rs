@@ -4,21 +4,24 @@ use unicode_segmentation::UnicodeSegmentation;
 pub struct UserName(String);
 
 impl UserName {
-    // Returns an instance of SubscriberName if all conditions are met
+    /// Returns an instance of `UserName` if all conditions are met.
     pub fn parse(s: String) -> Result<Self, String> {
-        let is_empty_or_whitespace = s.trim().is_empty();
+        let trimmed = s.trim();
 
-        let is_too_long = s.graphemes(true).count() > 256;
+        if trimmed.is_empty() {
+            return Err("Invalid user name: cannot be empty or whitespace.".to_string());
+        }
+
+        if trimmed.graphemes(true).count() > 256 {
+            return Err("Invalid user name: cannot be longer than 256 characters.".to_string());
+        }
 
         let forbidden_characters = ['/', '(', ')', '"', '<', '>', '\\', '{', '}'];
-
-        let contains_forbidden_characters = s.chars().any(|c| forbidden_characters.contains(&c));
-
-        if is_empty_or_whitespace || is_too_long || contains_forbidden_characters {
-            Err(format!("{s} is not a valid subscriber name."))
-        } else {
-            Ok(Self(s))
+        if trimmed.chars().any(|c| forbidden_characters.contains(&c)) {
+            return Err("Invalid user name: contains forbidden characters. The following are not allowed: / ( ) \" < > \\ { }".to_string());
         }
+
+        Ok(Self(trimmed.to_string()))
     }
 }
 

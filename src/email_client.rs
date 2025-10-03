@@ -1,4 +1,5 @@
 use crate::domain::UserEmail;
+use crate::routes::error_chain_fmt;
 use reqwest::{Client, Url};
 use secrecy::{ExposeSecret, Secret};
 
@@ -19,33 +20,18 @@ struct SendEmailRequest<'a> {
     text_body: &'a str,
 }
 
-#[derive(Debug)]
+#[derive(thiserror::Error)]
 pub enum EmailError {
-    Request(reqwest::Error),
-    Url(url::ParseError),
+    #[error(transparent)]
+    Request(#[from] reqwest::Error),
+
+    #[error(transparent)]
+    Url(#[from] url::ParseError),
 }
 
-impl std::error::Error for EmailError {}
-
-impl std::fmt::Display for EmailError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "An error was encountered while \
-            trying to send email."
-        )
-    }
-}
-
-impl From<reqwest::Error> for EmailError {
-    fn from(err: reqwest::Error) -> Self {
-        EmailError::Request(err)
-    }
-}
-
-impl From<url::ParseError> for EmailError {
-    fn from(err: url::ParseError) -> Self {
-        EmailError::Url(err)
+impl std::fmt::Debug for EmailError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        error_chain_fmt(self, f)
     }
 }
 

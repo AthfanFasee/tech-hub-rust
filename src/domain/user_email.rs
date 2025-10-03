@@ -4,13 +4,30 @@ use validator::ValidateEmail;
 pub struct UserEmail(String);
 
 impl UserEmail {
-    pub fn parse(s: String) -> Result<UserEmail, String> {
-        // ValidateEmail trait is implemented for String hence it's possible to use `validate_email` on it
-        if s.validate_email() {
-            Ok(UserEmail(s))
-        } else {
-            Err(format!("Email is invalid: {s}"))
+    /// Returns an instance of `UserEmail` if all conditions are met.
+    pub fn parse(s: String) -> Result<Self, String> {
+        let trimmed = s.trim();
+
+        if trimmed.is_empty() {
+            return Err("Invalid email: email cannot be empty.".to_string());
         }
+
+        // RFC 5321: 64 local + 1 @ + 255 domain = 320 characters
+        if trimmed.len() > 320 {
+            return Err("Invalid email: cannot be longer than 320 characters.".to_string());
+        }
+
+        if !trimmed.contains('@') {
+            return Err("Invalid email: missing '@' character.".to_string());
+        }
+
+        if !trimmed.validate_email() {
+            return Err(format!(
+                "Invalid email: '{trimmed}' does not match the required format."
+            ));
+        }
+
+        Ok(UserEmail(trimmed.to_string()))
     }
 }
 

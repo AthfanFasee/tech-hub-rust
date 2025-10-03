@@ -46,6 +46,7 @@ impl Application {
     }
 
     pub async fn run_until_stopped(self) -> Result<(), std::io::Error> {
+        // run returns a Server type, which implements Future trait
         self.server.await
     }
 }

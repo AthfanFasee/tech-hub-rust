@@ -4,8 +4,8 @@ run:
 	cargo fmt
 	@echo "Running cargo check..."
 	cargo check
-	@echo "Running cargo run..."
-	cargo run
+	@echo "Running cargo run with with bunyan formatted logs..."
+	cargo run | bunyan
 
 # Test command: performs check, format, and test
 test:

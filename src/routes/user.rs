@@ -108,6 +108,7 @@ pub async fn add_user(
     email_client: web::Data<EmailClient>,
     base_url: web::Data<ApplicationBaseUrl>,
 ) -> Result<HttpResponse, UserError> {
+    // ValidationError doesn't have a from or source hence we are forced to map this error to the correct enum variant
     let new_user = payload.0.try_into().map_err(UserError::ValidationError)?;
 
     let mut transaction = pool
@@ -183,10 +184,7 @@ pub async fn store_activation_token(
     Ok(())
 }
 
-#[tracing::instrument(
-    name = "Send a confirmation email to new user",
-    skip(email_client, new_user)
-)]
+#[tracing::instrument(name = "Send a confirmation email to new user", skip_all)]
 pub async fn send_confirmation_email(
     email_client: &EmailClient,
     new_user: NewUser,

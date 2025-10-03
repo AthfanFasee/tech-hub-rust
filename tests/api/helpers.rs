@@ -4,9 +4,9 @@ use secrecy::Secret;
 use serde_json::Value;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::sync::LazyLock;
-use techhub::configuration::{get_config, DatabaseConfigs};
-use techhub::startup::get_connection_pool;
+use techhub::configuration::{DatabaseConfigs, get_config};
 use techhub::startup::Application;
+use techhub::startup::get_connection_pool;
 use techhub::telemetry;
 use uuid::Uuid;
 use wiremock::MockServer;
@@ -45,9 +45,9 @@ impl TestUser {
             password_hash,
             self.email
         )
-            .execute(pool)
-            .await
-            .expect("Failed to store test user");
+        .execute(pool)
+        .await
+        .expect("Failed to store test user");
     }
 }
 
