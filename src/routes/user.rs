@@ -1,37 +1,18 @@
 use crate::domain::{NewUser, UserEmail, UserName};
 use crate::email_client::EmailClient;
 use crate::email_client::EmailError;
+use crate::routes::{build_error_response, error_chain_fmt};
 use crate::startup::ApplicationBaseUrl;
-use actix_web::http::StatusCode;
 use actix_web::ResponseError;
-use actix_web::{web, HttpResponse};
+use actix_web::http::StatusCode;
+use actix_web::{HttpResponse, web};
 use anyhow::Context;
 use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
+use rand::{Rng, thread_rng};
 use serde::Deserialize;
 use serde::Serialize;
 use sqlx::{Executor, PgPool, Postgres, Transaction};
 use uuid::Uuid;
-
-pub fn error_chain_fmt(
-    e: &(dyn std::error::Error),
-    f: &mut std::fmt::Formatter<'_>,
-) -> std::fmt::Result {
-    // Top-level: use Display to avoid recursion
-    writeln!(f, "{e}")?;
-
-    let mut current = e.source();
-    while let Some(cause) = current {
-        // For causes: use Debug if caller asked for `:#?` (`tracing::debug!("{:#?}", err)`), else Display (`tracing::error!("{:?}", err)`)
-        if f.alternate() {
-            writeln!(f, "Caused by:\n\t{cause:?}")?;
-        } else {
-            writeln!(f, "Caused by:\n\t{cause}")?;
-        }
-        current = cause.source();
-    }
-    Ok(())
-}
 
 #[derive(thiserror::Error)]
 pub enum UserError {
@@ -56,19 +37,8 @@ impl ResponseError for UserError {
             UserError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
-        let error_response = ErrorResponse {
-            code: status_code.as_u16(),
-            message: self.to_string(),
-        };
-
-        HttpResponse::build(status_code).json(error_response)
+        build_error_response(status_code, self.to_string())
     }
-}
-
-#[derive(Serialize)]
-pub struct ErrorResponse {
-    pub code: u16,
-    pub message: String,
 }
 
 #[derive(Serialize)]
@@ -193,7 +163,7 @@ pub async fn send_confirmation_email(
 ) -> Result<(), EmailError> {
     let confirmation_link = format!("{base_url}/user/confirm?token={token}");
     let plain_body =
-        format!("Welcome to TechHub!\nVisit {confirmation_link} to confirm your subscription.", );
+        format!("Welcome to TechHub!\nVisit {confirmation_link} to confirm your subscription.",);
     let html_body = format!(
         "Welcome to TechHub!<br />\
         Click <a href=\"{confirmation_link}\">here</a> to confirm your subscription.",

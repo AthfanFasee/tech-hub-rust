@@ -1,7 +1,6 @@
 use crate::domain::UserEmail;
 use crate::email_client::EmailClient;
-use crate::routes::ErrorResponse;
-use crate::routes::error_chain_fmt;
+use crate::routes::{build_error_response, error_chain_fmt};
 use actix_web::http::header::{HeaderMap, HeaderValue};
 use actix_web::http::{StatusCode, header};
 use actix_web::{HttpRequest, HttpResponse, ResponseError, web};
@@ -31,21 +30,10 @@ impl ResponseError for PublishError {
     fn error_response(&self) -> HttpResponse {
         match self {
             PublishError::UnexpectedError(_) => {
-                let status_code = StatusCode::INTERNAL_SERVER_ERROR;
-                let error_response = ErrorResponse {
-                    code: status_code.as_u16(),
-                    message: self.to_string(),
-                };
-                HttpResponse::build(status_code).json(error_response)
+                build_error_response(StatusCode::INTERNAL_SERVER_ERROR, self.to_string())
             }
             PublishError::AuthError(_) => {
-                let status_code = StatusCode::UNAUTHORIZED;
-                let error_response = ErrorResponse {
-                    code: status_code.as_u16(),
-                    message: self.to_string(),
-                };
-
-                let mut response = HttpResponse::build(status_code).json(error_response);
+                let mut response = build_error_response(StatusCode::UNAUTHORIZED, self.to_string());
                 let header_value = HeaderValue::from_str(r#"Basic realm="publish""#).unwrap();
                 response
                     .headers_mut()

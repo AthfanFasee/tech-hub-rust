@@ -1,4 +1,4 @@
-use crate::routes::ErrorResponse;
+use crate::routes::{build_error_response, error_chain_fmt};
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, ResponseError, web};
 use anyhow::Context;
@@ -21,7 +21,7 @@ pub enum UserConfirmError {
 
 impl std::fmt::Debug for UserConfirmError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        crate::routes::user::error_chain_fmt(self, f)
+        error_chain_fmt(self, f)
     }
 }
 
@@ -31,13 +31,7 @@ impl ResponseError for UserConfirmError {
             UserConfirmError::UnknownToken => StatusCode::UNAUTHORIZED,
             UserConfirmError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
-
-        let error_response = ErrorResponse {
-            code: status_code.as_u16(),
-            message: self.to_string(),
-        };
-
-        HttpResponse::build(status_code).json(error_response)
+        build_error_response(status_code, self.to_string())
     }
 }
 
