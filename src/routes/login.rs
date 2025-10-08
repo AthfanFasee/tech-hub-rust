@@ -1,9 +1,9 @@
 use crate::authentication::AuthError;
-use crate::authentication::{validate_credentials, Credentials};
+use crate::authentication::{Credentials, validate_credentials};
 use crate::routes::{build_error_response, error_chain_fmt};
 use crate::session_state::TypedSession;
 use actix_web::http::StatusCode;
-use actix_web::{web, HttpResponse, ResponseError};
+use actix_web::{HttpResponse, ResponseError, web};
 use secrecy::Secret;
 use sqlx::PgPool;
 
