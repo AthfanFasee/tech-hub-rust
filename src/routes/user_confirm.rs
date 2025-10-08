@@ -37,13 +37,14 @@ impl ResponseError for UserConfirmError {
 
 #[tracing::instrument(name = "Confirm a pending user activation", skip(parameters, pool))]
 
-pub async fn user_confirm(
+pub async fn confirm_user(
     parameters: web::Query<Parameters>,
     pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, UserConfirmError> {
     let user_id = get_user_id_from_token(&pool, &parameters.token)
         .await
         .context("Failed to retrieve the user id associated with the provided token.")?
+        // Domain error (invalid token), so a new `UserConfirmError::UnknownToken` error is created instead of wrapping an `anyhow::Error`
         .ok_or(UserConfirmError::UnknownToken)?;
 
     activate_user_and_delete_token(&pool, user_id, &parameters.token)

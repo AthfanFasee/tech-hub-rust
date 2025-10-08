@@ -7,6 +7,7 @@ PRIMARY KEY (id),
 "password_hash" TEXT NOT NULL,
 "is_activated" BOOLEAN NOT NULL DEFAULT FALSE,
 "is_subscribed" BOOLEAN NOT NULL DEFAULT FALSE,
+"is_admin" BOOLEAN NOT NULL DEFAULT FALSE,
 "version" INTEGER NOT NULL DEFAULT 1
 );
 

@@ -72,7 +72,7 @@ impl TryFrom<UserData> for NewUser {
         user_name = %payload.name,
     )
 )]
-pub async fn add_user(
+pub async fn register_user(
     payload: web::Json<UserData>,
     pool: web::Data<PgPool>,
     email_client: web::Data<EmailClient>,

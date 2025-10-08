@@ -9,7 +9,7 @@ async fn main() {
     }
 }
 
-async fn try_main() -> Result<(), std::io::Error> {
+async fn try_main() -> anyhow::Result<()> {
     let subscriber = telemetry::get_subscriber("techhub".into(), "info".into(), std::io::stdout);
     telemetry::init_subscriber(subscriber);
     let config = configuration::get_config().expect("Failed to read config");

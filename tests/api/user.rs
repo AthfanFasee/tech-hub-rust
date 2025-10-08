@@ -3,7 +3,7 @@ use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
 
 #[tokio::test]
-async fn add_user_returns_a_200_for_valid_json_data() {
+async fn register_user_returns_a_200_for_valid_json_data() {
     let app = spawn_app().await;
 
     let payload = serde_json::json!({
@@ -17,13 +17,13 @@ async fn add_user_returns_a_200_for_valid_json_data() {
         .mount(&app.email_server)
         .await;
 
-    let response = app.add_user(&payload).await;
+    let response = app.register_user(&payload).await;
 
     assert!(response.status().is_success());
 }
 
 #[tokio::test]
-async fn add_user_persists_the_new_user() {
+async fn register_user_persists_the_new_user() {
     let app = spawn_app().await;
 
     let user = TestUser::generate();
@@ -38,7 +38,7 @@ async fn add_user_persists_the_new_user() {
         .mount(&app.email_server)
         .await;
 
-    app.add_user(&payload).await;
+    app.register_user(&payload).await;
 
     let saved = sqlx::query!(
         r#"
@@ -59,7 +59,7 @@ async fn add_user_persists_the_new_user() {
 }
 
 #[tokio::test]
-async fn add_user_returns_a_400_when_data_is_missing() {
+async fn register_user_returns_a_400_when_data_is_missing() {
     let app = spawn_app().await;
 
     let test_cases = vec![
@@ -72,7 +72,7 @@ async fn add_user_returns_a_400_when_data_is_missing() {
     ];
 
     for (invalid_payload, _error_message) in test_cases {
-        let response = app.add_user(&invalid_payload).await;
+        let response = app.register_user(&invalid_payload).await;
 
         assert_eq!(
             400,
@@ -83,7 +83,7 @@ async fn add_user_returns_a_400_when_data_is_missing() {
 }
 
 #[tokio::test]
-async fn add_user_returns_a_400_when_data_is_present_but_invalid() {
+async fn register_user_returns_a_400_when_data_is_present_but_invalid() {
     let app = spawn_app().await;
 
     let test_cases = vec![
@@ -106,7 +106,7 @@ async fn add_user_returns_a_400_when_data_is_present_but_invalid() {
     ];
 
     for (invalid_payload, _error_message) in test_cases {
-        let response = app.add_user(&invalid_payload).await;
+        let response = app.register_user(&invalid_payload).await;
 
         assert_eq!(
             400,
@@ -117,7 +117,7 @@ async fn add_user_returns_a_400_when_data_is_present_but_invalid() {
 }
 
 #[tokio::test]
-async fn add_user_sends_a_confirmation_email_for_valid_data() {
+async fn register_user_sends_a_confirmation_email_for_valid_data() {
     let app = spawn_app().await;
     let user = TestUser::generate();
     let payload = serde_json::json!({
@@ -132,11 +132,11 @@ async fn add_user_sends_a_confirmation_email_for_valid_data() {
         .mount(&app.email_server)
         .await;
 
-    app.add_user(&payload).await;
+    app.register_user(&payload).await;
 }
 
 #[tokio::test]
-async fn add_user_sends_a_confirmation_email_with_a_link() {
+async fn register_user_sends_a_confirmation_email_with_a_link() {
     let app = spawn_app().await;
     let user = TestUser::generate();
     let payload = serde_json::json!({
@@ -150,7 +150,7 @@ async fn add_user_sends_a_confirmation_email_with_a_link() {
         .mount(&app.email_server)
         .await;
 
-    app.add_user(&payload).await;
+    app.register_user(&payload).await;
 
     let email_request = &app.email_server.received_requests().await.unwrap()[0];
 
@@ -161,7 +161,7 @@ async fn add_user_sends_a_confirmation_email_with_a_link() {
 }
 
 #[tokio::test]
-async fn add_user_fails_if_there_is_a_fatal_database_error() {
+async fn register_user_fails_if_there_is_a_fatal_database_error() {
     let app = spawn_app().await;
     let user = TestUser::generate();
     let payload = serde_json::json!({
@@ -175,7 +175,7 @@ async fn add_user_fails_if_there_is_a_fatal_database_error() {
         .await
         .unwrap();
 
-    let response = app.add_user(&payload).await;
+    let response = app.register_user(&payload).await;
 
     assert_eq!(response.status().as_u16(), 500);
 }

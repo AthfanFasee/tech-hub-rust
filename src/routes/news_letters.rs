@@ -1,3 +1,4 @@
+use crate::authentication::{AuthError, Credentials, validate_credentials};
 use crate::domain::UserEmail;
 use crate::email_client::EmailClient;
 use crate::routes::{build_error_response, error_chain_fmt};
@@ -5,9 +6,7 @@ use actix_web::http::header::{HeaderMap, HeaderValue};
 use actix_web::http::{StatusCode, header};
 use actix_web::{HttpRequest, HttpResponse, ResponseError, web};
 use anyhow::Context;
-use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use base64::Engine;
-use secrecy::ExposeSecret;
 use secrecy::Secret;
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -55,14 +54,9 @@ pub struct Content {
     text: String,
 }
 
-struct Credentials {
-    username: String,
-    password: Secret<String>,
-}
-
 #[tracing::instrument(
     name = "Publish a newsletter issue",
-    skip(body, pool, email_client, request),
+    skip_all,
     fields(username=tracing::field::Empty, user_id=tracing::field::Empty)
 )]
 
@@ -73,9 +67,18 @@ pub async fn publish_newsletter(
     request: HttpRequest,
 ) -> Result<HttpResponse, PublishError> {
     let credentials = basic_authentication(request.headers()).map_err(PublishError::AuthError)?;
+
+    // Just because publishing newsletters is an important action we are logging who tried to do that.
     tracing::Span::current().record("username", tracing::field::display(&credentials.username));
 
-    let user_id = validate_credentials(credentials, &pool).await?;
+    let user_id = validate_credentials(credentials, &pool)
+        .await
+        // This manual mapping is important bcs in this case, you need to control exactly how different auth errors map to different HTTP responses.
+        .map_err(|e| match e {
+            AuthError::InvalidCredentials(_) => PublishError::AuthError(e.into()),
+            AuthError::UnexpectedError(_) => PublishError::UnexpectedError(e.into()),
+        })?;
+
     tracing::Span::current().record("user_id", tracing::field::display(&user_id));
 
     let users = get_activated_users(&pool).await?;
@@ -112,7 +115,7 @@ struct ConfirmedUser {
     email: UserEmail,
 }
 
-#[tracing::instrument(name = "Get activated users", skip(pool))]
+#[tracing::instrument(name = "Get activated users", skip_all)]
 async fn get_activated_users(
     pool: &PgPool,
 ) -> Result<Vec<Result<ConfirmedUser, anyhow::Error>>, anyhow::Error> {
@@ -166,47 +169,4 @@ fn basic_authentication(headers: &HeaderMap) -> Result<Credentials, anyhow::Erro
         username,
         password: Secret::new(password),
     })
-}
-
-#[tracing::instrument(name = "Validate credentials", skip(credentials, pool))]
-async fn validate_credentials(
-    credentials: Credentials,
-    pool: &PgPool,
-) -> Result<uuid::Uuid, PublishError> {
-    let (user_id, expected_password_hash) = get_stored_credentials(&credentials.username, pool)
-        .await
-        .map_err(PublishError::UnexpectedError)?
-        .ok_or_else(|| PublishError::AuthError(anyhow::anyhow!("Unknown username.")))?;
-
-    let expected_password_hash = PasswordHash::new(expected_password_hash.expose_secret())
-        .context("Failed to parse hash in PHC string format.")
-        .map_err(PublishError::UnexpectedError)?;
-    Argon2::default()
-        .verify_password(
-            credentials.password.expose_secret().as_bytes(),
-            &expected_password_hash,
-        )
-        .context("Invalid password.")
-        .map_err(PublishError::AuthError)?;
-    Ok(user_id)
-}
-
-#[tracing::instrument(name = "Get stored credentials", skip(pool))]
-async fn get_stored_credentials(
-    username: &str,
-    pool: &PgPool,
-) -> Result<Option<(uuid::Uuid, Secret<String>)>, anyhow::Error> {
-    let row = sqlx::query!(
-        r#"
-    SELECT id, password_hash
-    FROM users
-    WHERE name = $1
-    "#,
-        username,
-    )
-    .fetch_optional(pool)
-    .await
-    .context("Failed to perform a query to retrieve stored credentials.")?
-    .map(|row| (row.id, Secret::new(row.password_hash)));
-    Ok(row)
 }

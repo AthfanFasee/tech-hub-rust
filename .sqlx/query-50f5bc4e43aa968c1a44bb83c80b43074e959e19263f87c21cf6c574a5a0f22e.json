@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n    SELECT id, password_hash\n    FROM users\n    WHERE name = $1\n    ",
+  "query": "\n    SELECT id, password_hash\n    FROM users\n    WHERE name = $1\n    and is_activated = true\n    ",
   "describe": {
     "columns": [
       {
@@ -24,5 +24,5 @@
       false
     ]
   },
-  "hash": "c1150249bf3d36e9e7f56a15cf9fce09a7ef0d22dabeb78b2bc702db073df028"
+  "hash": "50f5bc4e43aa968c1a44bb83c80b43074e959e19263f87c21cf6c574a5a0f22e"
 }

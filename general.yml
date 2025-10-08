@@ -89,17 +89,10 @@ jobs:
       - name: Enforce formatting
         run: cargo fmt --check
 
-  # `clippy` container job
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
     env:
-      # This environment variable forces sqlx to use its offline mode,
-      # which means that it will not attempt to connect to a database
-      # when running the tests. It'll instead use the cached query results.
-      # We check that the cached query results are up-to-date in another job,
-      # to speed up the overall CI pipeline.
-      # This will all be covered in detail in chapter 5.
       SQLX_OFFLINE: true
     steps:
       - uses: actions/checkout@v4
@@ -110,7 +103,6 @@ jobs:
       - name: Linting
         run: cargo clippy -- -D warnings
 
-  # `coverage` container job
   coverage:
     name: Code coverage
     runs-on: ubuntu-latest
@@ -123,6 +115,10 @@ jobs:
           POSTGRES_DB: postgres
         ports:
           - 5432:5432
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
     steps:
       - uses: actions/checkout@v4
       - name: Install the Rust toolchain

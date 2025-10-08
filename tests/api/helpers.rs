@@ -1,5 +1,5 @@
 use argon2::password_hash::SaltString;
-use argon2::{Argon2, PasswordHasher};
+use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version};
 use secrecy::Secret;
 use serde_json::Value;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
@@ -32,18 +32,24 @@ impl TestUser {
     async fn store(&self, pool: &PgPool) {
         let salt = SaltString::generate(&mut rand::thread_rng());
 
-        let password_hash = Argon2::default()
-            .hash_password(self.password.as_bytes(), &salt)
-            .unwrap()
-            .to_string();
+        let password_hash = Argon2::new(
+            Algorithm::Argon2id,
+            Version::V0x13,
+            Params::new(15000, 2, 1, None).unwrap(),
+        )
+        .hash_password(self.password.as_bytes(), &salt)
+        .unwrap()
+        .to_string();
 
         sqlx::query!(
-            "INSERT INTO users (id, name, password_hash, email)
-            VALUES ($1, $2, $3, $4)",
+            "INSERT INTO users (id, name, password_hash, email, is_activated, is_admin)
+            VALUES ($1, $2, $3, $4, $5, $6)",
             self.user_id,
             self.username,
             password_hash,
-            self.email
+            self.email,
+            true,
+            true,
         )
         .execute(pool)
         .await
@@ -57,6 +63,7 @@ pub struct TestApp {
     pub email_server: MockServer,
     pub port: u16,
     pub test_user: TestUser,
+    pub api_client: reqwest::Client,
 }
 
 // Confirmation links embedded in the request to the email API.
@@ -92,9 +99,9 @@ impl TestApp {
         ConfirmationLinks { html, plain_text }
     }
 
-    pub async fn add_user(&self, payload: &Value) -> reqwest::Response {
-        reqwest::Client::new()
-            .post(&format!("{}/user/add", self.address))
+    pub async fn register_user(&self, payload: &Value) -> reqwest::Response {
+        self.api_client
+            .post(&format!("{}/user/register", self.address))
             .header(reqwest::header::CONTENT_TYPE, "application/json")
             .json(payload)
             .send()
@@ -102,19 +109,29 @@ impl TestApp {
             .expect("Failed to execute request: add_user")
     }
 
-    pub async fn post_newsletters(&self, body: Value) -> reqwest::Response {
-        reqwest::Client::new()
-            .post(&format!("{}/newsletters", &self.address))
+    pub async fn publish_newsletters(&self, payload: Value) -> reqwest::Response {
+        self.api_client
+            .post(&format!("{}/newsletters/publish", &self.address))
             .basic_auth(&self.test_user.username, Some(&self.test_user.password))
-            .json(&body)
+            .json(&payload)
             .send()
             .await
             .expect("Failed to execute request.")
     }
-    pub async fn post_newsletters_unauthorized(&self, body: Value) -> reqwest::Response {
-        reqwest::Client::new()
-            .post(&format!("{}/newsletters", &self.address))
-            .json(&body)
+
+    pub async fn publish_newsletters_unauthorized(&self, payload: Value) -> reqwest::Response {
+        self.api_client
+            .post(&format!("{}/newsletters/publish", &self.address))
+            .json(&payload)
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
+
+    pub async fn login(&self, payload: &Value) -> reqwest::Response {
+        self.api_client
+            .post(&format!("{}/login", &self.address))
+            .json(&payload)
             .send()
             .await
             .expect("Failed to execute request.")
@@ -172,6 +189,7 @@ pub async fn spawn_app() -> TestApp {
         db_pool: get_connection_pool(&configuration.database),
         email_server,
         test_user: TestUser::generate(),
+        api_client: reqwest::Client::new(),
     };
 
     test_app.test_user.store(&test_app.db_pool).await;

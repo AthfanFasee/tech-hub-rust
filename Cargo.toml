@@ -42,6 +42,7 @@ thiserror = "2.0.16"
 anyhow = "1"
 argon2 = { version = "0.5", features = ["std"] }
 base64 = "0.22.1"
+actix-session = { version = "0.10", features = ["redis-session-rustls"] }
 
 
 [dev-dependencies]

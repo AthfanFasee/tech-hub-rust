@@ -7,6 +7,7 @@ run:
 	@echo "Running cargo run with with bunyan formatted logs..."
 	cargo run | bunyan
 
+
 # Test command: performs check, format, and test
 test:
 	@echo "Running cargo check..."
@@ -16,14 +17,24 @@ test:
 	@echo "Running cargo test"
 	@unset RUST_LOG && unset TEST_LOG && cargo test
 
-# Test-log command: performs check, format, then runs tests with bunyan logging
+# Test log command: performs check, format, then runs tests with bunyan logging
 test-log:
 	@echo "Running cargo check..."
 	cargo check
 	@echo "Running cargo fmt..."
 	cargo fmt
 	@echo "Running cargo test with bunyan formatted logs..."
-	@export RUST_LOG="sqlx=error,info" && export TEST_LOG=true && cargo test | bunyan
+	@export RUST_LOG="sqlx=error,info,error" && export TEST_LOG=true && cargo test | bunyan
+
+# Test log debug command: performs check, format, then runs tests with bunyan logging
+test-log-debug:
+	@echo "Running cargo check..."
+	cargo check
+	@echo "Running cargo fmt..."
+	cargo fmt
+	@echo "Running cargo test with bunyan formatted logs..."
+	@export RUST_LOG="sqlx=error,debug" && export TEST_LOG=true && cargo test | bunyan
+
 
 # Create new migration file
 migrate-add:
@@ -41,7 +52,7 @@ migrate:
 	@echo "Running cargo sqlx prepare..."
 	cargo sqlx prepare
 
-# Migrate new: delete existing container and re-init db
+# Migrate new command: delete existing container and re-init db
 migrate-new:
 	@echo "Stopping and removing existing postgres container..."
 	-docker rm -f techhub_postgres || true
@@ -49,3 +60,9 @@ migrate-new:
 	./scripts/init_db.sh
 	@echo "Running cargo sqlx prepare..."
 	cargo sqlx prepare
+
+
+# Redis command: launch a redis container
+redis:
+	@echo "Launching a new redis container..."
+	./scripts/init_redis.sh

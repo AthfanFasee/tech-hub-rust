@@ -1,5 +1,7 @@
 application:
   port: 8000
+  hmac_secret: "7X3ja7iFGQ4CDvtbN6a+9gGjtm5Zq1RjftOW+phz96jThAkXWt5uVXunDH3dRsYwHQgdfWf0WWcu8V0GkwV4R043Z15MXgDSFmYPG5yG9YYi"
+  redis_uri: "redis://127.0.0.1:6379"
 database:
   host: "127.0.0.1"
   port: 5432
