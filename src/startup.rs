@@ -5,6 +5,7 @@ use actix_session::SessionMiddleware;
 use actix_session::storage::RedisSessionStore;
 use actix_web::dev::Server;
 use actix_web::{App, HttpServer, web};
+use anyhow::Context;
 use secrecy::{ExposeSecret, Secret};
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
@@ -32,8 +33,12 @@ impl Application {
         );
 
         let address = format!("{}:{}", config.application.host, config.application.port);
-        let listener = TcpListener::bind(address)?;
-        let port = listener.local_addr()?.port();
+        let listener = TcpListener::bind(address)
+            .with_context(|| "Failed to bind TCP listener for application")?;
+        let port = listener
+            .local_addr()
+            .with_context(|| "Failed to read local address of TCP listener")?
+            .port();
         let server = run(
             listener,
             connection_pool,
@@ -42,7 +47,8 @@ impl Application {
             config.application.hmac_secret,
             config.application.redis_uri,
         )
-        .await?;
+        .await
+        .context("Failed to run Actix web server")?;
 
         Ok(Self { port, server })
     }
@@ -51,9 +57,9 @@ impl Application {
         self.port
     }
 
-    pub async fn run_until_stopped(self) -> Result<(), std::io::Error> {
+    pub async fn run_until_stopped(self) -> Result<(), anyhow::Error> {
         // run returns a Server type, which implements Future trait
-        self.server.await
+        self.server.await.context("Server stopped with an error")
     }
 }
 
@@ -76,7 +82,10 @@ async fn run(
     let base_url = web::Data::new(ApplicationBaseUrl(base_url));
 
     let secret_key = actix_web::cookie::Key::from(hmac_secret.expose_secret().as_bytes());
-    let redis_store = RedisSessionStore::new(redis_uri.expose_secret()).await?;
+
+    let redis_store = RedisSessionStore::new(redis_uri.expose_secret())
+        .await
+        .context("Failed to connect to Redis session store")?;
 
     let server = HttpServer::new(move || {
         App::new()
@@ -95,7 +104,8 @@ async fn run(
             .app_data(email_client.clone())
             .app_data(base_url.clone())
     })
-    .listen(tcp_listener)?
+    .listen(tcp_listener)
+    .with_context(|| "Failed to bind Actix server to TCP listener")?
     .run();
 
     Ok(server)
