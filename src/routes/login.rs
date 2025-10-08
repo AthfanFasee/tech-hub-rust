@@ -1,8 +1,9 @@
 use crate::authentication::AuthError;
-use crate::authentication::{Credentials, validate_credentials};
+use crate::authentication::{validate_credentials, Credentials};
 use crate::routes::{build_error_response, error_chain_fmt};
+use crate::session_state::TypedSession;
 use actix_web::http::StatusCode;
-use actix_web::{HttpResponse, ResponseError, web};
+use actix_web::{web, HttpResponse, ResponseError};
 use secrecy::Secret;
 use sqlx::PgPool;
 
@@ -10,7 +11,7 @@ use sqlx::PgPool;
 pub enum LoginError {
     #[error("Authentication failed")]
     AuthError(#[source] anyhow::Error),
-    #[error("Something went wrong")]
+    #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),
 }
 
@@ -44,6 +45,7 @@ pub struct LoginData {
 pub async fn login(
     payload: web::Json<LoginData>,
     pool: web::Data<PgPool>,
+    session: TypedSession,
 ) -> Result<HttpResponse, LoginError> {
     let credentials = Credentials {
         username: payload.0.username,
@@ -57,6 +59,10 @@ pub async fn login(
             AuthError::InvalidCredentials(_) => LoginError::AuthError(e.into()),
             AuthError::UnexpectedError(_) => LoginError::UnexpectedError(e.into()),
         })?;
+
+    // say no to session fixation attack with `session.renew()`
+    session.renew();
+    session.insert_user_id(user_id)?;
 
     tracing::Span::current().record("user_id", tracing::field::display(&user_id));
     Ok(HttpResponse::Ok().finish())
