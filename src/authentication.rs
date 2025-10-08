@@ -71,7 +71,6 @@ fn verify_password_hash(
         .map_err(AuthError::InvalidCredentials)
 }
 
-// TODO might wanna differentiate between unknown user vs in_activated user here for logging context only
 #[tracing::instrument(name = "Get stored credentials", skip_all)]
 async fn get_stored_credentials(
     username: &str,
