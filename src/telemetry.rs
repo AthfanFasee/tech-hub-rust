@@ -30,7 +30,7 @@ where
         .with(formatting_layer)
 }
 
-/// It should only be called once!
+// `init_subscriber` should only be called once!
 pub fn init_subscriber(subscriber: impl Subscriber + Send + Sync) {
     LogTracer::init().expect("Failed to set logger");
     set_global_default(subscriber).expect("Failed to set subscriber");
@@ -48,7 +48,8 @@ pub struct NewlineWriter<W> {
 impl<W: Write> Write for NewlineWriter<W> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         self.inner.write(buf)?;
-        self.inner.write_all(b"\n")?; // Add newline after each write
+        // Add newline after each write
+        self.inner.write_all(b"\n")?;
         Ok(buf.len())
     }
 

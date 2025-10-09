@@ -4,9 +4,9 @@ use secrecy::Secret;
 use serde_json::Value;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::sync::LazyLock;
-use techhub::configuration::{get_config, DatabaseConfigs};
-use techhub::startup::get_connection_pool;
+use techhub::configuration::{DatabaseConfigs, get_config};
 use techhub::startup::Application;
+use techhub::startup::get_connection_pool;
 use techhub::telemetry;
 use uuid::Uuid;
 use wiremock::MockServer;
@@ -37,9 +37,9 @@ impl TestUser {
             Version::V0x13,
             Params::new(15000, 2, 1, None).unwrap(),
         )
-            .hash_password(self.password.as_bytes(), &salt)
-            .unwrap()
-            .to_string();
+        .hash_password(self.password.as_bytes(), &salt)
+        .unwrap()
+        .to_string();
 
         sqlx::query!(
             "INSERT INTO users (id, name, password_hash, email, is_activated)
@@ -50,9 +50,9 @@ impl TestUser {
             self.email,
             true,
         )
-            .execute(pool)
-            .await
-            .expect("Failed to store test user");
+        .execute(pool)
+        .await
+        .expect("Failed to store test user");
     }
 }
 
@@ -145,7 +145,7 @@ impl TestApp {
 
     pub async fn access_protected_endpoint(&self) -> reqwest::Response {
         self.api_client
-            .get(&format!("{}/protected", &self.address))
+            .get(&format!("{}/user/protected", &self.address))
             .send()
             .await
             .expect("Failed to execute request.")

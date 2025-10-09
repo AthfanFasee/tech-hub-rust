@@ -114,7 +114,7 @@ async fn run(
             .service(
                 web::scope("/admin")
                     .wrap(from_fn(reject_non_admin_users))
-                    .route("/newsletter/publish", web::post().to(publish_newsletter)),
+                    .route("/newsletters/publish", web::post().to(publish_newsletter)),
             )
             // register the db connection as part of the application state
             .app_data(db_pool.clone())

@@ -2,8 +2,7 @@ use crate::authentication::UserId;
 use crate::domain::UserEmail;
 use crate::email_client::EmailClient;
 use crate::{build_error_response, error_chain_fmt};
-use actix_web::http::header::HeaderValue;
-use actix_web::http::{StatusCode, header};
+use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, ResponseError, web};
 use anyhow::Context;
 use serde::Deserialize;
@@ -25,19 +24,12 @@ impl std::fmt::Debug for PublishError {
 
 impl ResponseError for PublishError {
     fn error_response(&self) -> HttpResponse {
-        match self {
-            PublishError::UnexpectedError(_) => {
-                build_error_response(StatusCode::INTERNAL_SERVER_ERROR, self.to_string())
-            }
-            PublishError::AuthError(_) => {
-                let mut response = build_error_response(StatusCode::UNAUTHORIZED, self.to_string());
-                let header_value = HeaderValue::from_str(r#"Basic realm="publish""#).unwrap();
-                response
-                    .headers_mut()
-                    .insert(header::WWW_AUTHENTICATE, header_value);
-                response
-            }
-        }
+        let status_code = match self {
+            PublishError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            PublishError::AuthError(_) => StatusCode::UNAUTHORIZED,
+        };
+
+        build_error_response(status_code, self.to_string())
     }
 }
 

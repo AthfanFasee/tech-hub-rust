@@ -76,6 +76,6 @@ pub async fn reject_non_admin_users(
         return Err(InternalError::from_response(anyhow::anyhow!(msg), response).into());
     }
 
-    req.extensions_mut().insert(user_id);
+    req.extensions_mut().insert(UserId(user_id));
     next.call(req).await
 }
