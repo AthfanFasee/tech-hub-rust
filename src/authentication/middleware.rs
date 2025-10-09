@@ -1,12 +1,11 @@
 use crate::session_state::TypedSession;
-use crate::utils::e500;
+use crate::utils::{build_error_response, e500};
 use actix_web::body::MessageBody;
 use actix_web::dev::{ServiceRequest, ServiceResponse};
 use actix_web::error::InternalError;
 use actix_web::http::StatusCode;
 use actix_web::middleware::Next;
-use actix_web::{FromRequest, HttpMessage, HttpResponse};
-use serde_json::json;
+use actix_web::{FromRequest, HttpMessage};
 use std::ops::Deref;
 use uuid::Uuid;
 
@@ -42,13 +41,41 @@ pub async fn reject_anonymous_users(
             next.call(req).await
         }
         None => {
-            let response = HttpResponse::build(StatusCode::UNAUTHORIZED).json(json!({
-                "code": 401,
-                "error": "User not logged in",
-            }));
-
-            let e = anyhow::anyhow!("The user has not logged in");
-            Err(InternalError::from_response(e, response).into())
+            let msg = "User has not logged in";
+            let response = build_error_response(StatusCode::UNAUTHORIZED, msg.to_string());
+            Err(InternalError::from_response(anyhow::anyhow!(msg), response).into())
         }
     }
+}
+
+pub async fn reject_non_admin_users(
+    mut req: ServiceRequest,
+    next: Next<impl MessageBody>,
+) -> Result<ServiceResponse<impl MessageBody>, actix_web::Error> {
+    let session = {
+        let (http_request, payload) = req.parts_mut();
+        TypedSession::from_request(http_request, payload).await
+    }?;
+
+    let user_id = session.get_user_id().map_err(e500)?.ok_or_else(|| {
+        let msg = "User has not logged in";
+        let response = build_error_response(StatusCode::UNAUTHORIZED, msg.to_string());
+        InternalError::from_response(anyhow::anyhow!(msg), response)
+    })?;
+
+    // we will only ever hit this if the session is somehow corrupted
+    let is_admin = session.get_is_admin().map_err(e500)?.ok_or_else(|| {
+        let msg = "Missing admin flag in session";
+        let response = build_error_response(StatusCode::UNAUTHORIZED, msg.to_string());
+        InternalError::from_response(anyhow::anyhow!(msg), response)
+    })?;
+
+    if !is_admin {
+        let msg = "Admin privileges required";
+        let response = build_error_response(StatusCode::FORBIDDEN, msg.to_string());
+        return Err(InternalError::from_response(anyhow::anyhow!(msg), response).into());
+    }
+
+    req.extensions_mut().insert(user_id);
+    next.call(req).await
 }

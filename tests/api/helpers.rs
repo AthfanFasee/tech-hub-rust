@@ -4,9 +4,9 @@ use secrecy::Secret;
 use serde_json::Value;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::sync::LazyLock;
-use techhub::configuration::{DatabaseConfigs, get_config};
-use techhub::startup::Application;
+use techhub::configuration::{get_config, DatabaseConfigs};
 use techhub::startup::get_connection_pool;
+use techhub::startup::Application;
 use techhub::telemetry;
 use uuid::Uuid;
 use wiremock::MockServer;
@@ -37,23 +37,22 @@ impl TestUser {
             Version::V0x13,
             Params::new(15000, 2, 1, None).unwrap(),
         )
-        .hash_password(self.password.as_bytes(), &salt)
-        .unwrap()
-        .to_string();
+            .hash_password(self.password.as_bytes(), &salt)
+            .unwrap()
+            .to_string();
 
         sqlx::query!(
-            "INSERT INTO users (id, name, password_hash, email, is_activated, is_admin)
-            VALUES ($1, $2, $3, $4, $5, $6)",
+            "INSERT INTO users (id, name, password_hash, email, is_activated)
+            VALUES ($1, $2, $3, $4, $5)",
             self.user_id,
             self.username,
             password_hash,
             self.email,
             true,
-            true,
         )
-        .execute(pool)
-        .await
-        .expect("Failed to store test user");
+            .execute(pool)
+            .await
+            .expect("Failed to store test user");
     }
 }
 
@@ -111,17 +110,7 @@ impl TestApp {
 
     pub async fn publish_newsletters(&self, payload: Value) -> reqwest::Response {
         self.api_client
-            .post(&format!("{}/newsletters/publish", &self.address))
-            .basic_auth(&self.test_user.username, Some(&self.test_user.password))
-            .json(&payload)
-            .send()
-            .await
-            .expect("Failed to execute request.")
-    }
-
-    pub async fn publish_newsletters_unauthorized(&self, payload: Value) -> reqwest::Response {
-        self.api_client
-            .post(&format!("{}/newsletters/publish", &self.address))
+            .post(&format!("{}/admin/newsletters/publish", &self.address))
             .json(&payload)
             .send()
             .await
@@ -160,6 +149,16 @@ impl TestApp {
             .send()
             .await
             .expect("Failed to execute request.")
+    }
+
+    pub async fn login_admin(&self) {
+        let login_body = serde_json::json!({
+            "username": "athfan",
+            "password": "athfan123"
+        });
+
+        let response = self.login(&login_body).await;
+        assert_eq!(response.status().as_u16(), 200);
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::authentication::reject_anonymous_users;
+use crate::authentication::{reject_anonymous_users, reject_non_admin_users};
 use crate::configuration::{Configuration, DatabaseConfigs};
 use crate::email_client::EmailClient;
 use crate::routes::{
@@ -105,12 +105,16 @@ async fn run(
             .route("/user/confirm", web::get().to(confirm_user))
             // these routes go through the authentication middleware
             .service(
-                web::scope("")
+                web::scope("/user")
                     .wrap(from_fn(reject_anonymous_users))
-                    .route("/user/reset-password", web::post().to(change_password))
-                    .route("/user/logout", web::post().to(log_out))
-                    .route("/protected", web::get().to(protected_endpoint))
-                    .route("/newsletters/publish", web::post().to(publish_newsletter)),
+                    .route("/reset-password", web::post().to(change_password))
+                    .route("/logout", web::post().to(log_out))
+                    .route("/protected", web::get().to(protected_endpoint)),
+            )
+            .service(
+                web::scope("/admin")
+                    .wrap(from_fn(reject_non_admin_users))
+                    .route("/newsletter/publish", web::post().to(publish_newsletter)),
             )
             // register the db connection as part of the application state
             .app_data(db_pool.clone())

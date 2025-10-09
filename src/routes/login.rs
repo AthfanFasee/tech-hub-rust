@@ -1,11 +1,13 @@
 use crate::authentication::AuthError;
 use crate::authentication::{Credentials, validate_credentials};
-use crate::routes::{build_error_response, error_chain_fmt};
 use crate::session_state::TypedSession;
+use crate::{build_error_response, error_chain_fmt};
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, ResponseError, web};
+use anyhow::Context;
 use secrecy::Secret;
 use sqlx::PgPool;
+use uuid::Uuid;
 
 #[derive(thiserror::Error)]
 pub enum LoginError {
@@ -60,9 +62,12 @@ pub async fn login(
             AuthError::UnexpectedError(_) => LoginError::UnexpectedError(e.into()),
         })?;
 
-    // say no to session fixation attack with `session.renew()`
+    let is_admin = is_admin_user(user_id, &pool).await?;
+
+    // prevent session fixation attacks with `session.renew()`
     session.renew();
     session.insert_user_id(user_id)?;
+    session.insert_is_admin(is_admin)?;
 
     tracing::Span::current().record("user_id", tracing::field::display(&user_id));
     Ok(HttpResponse::Ok().finish())
@@ -75,4 +80,25 @@ pub async fn log_out(session: TypedSession) -> Result<HttpResponse, LoginError> 
 
 pub async fn protected_endpoint() -> Result<HttpResponse, LoginError> {
     Ok(HttpResponse::Ok().finish())
+}
+
+#[tracing::instrument(name = "Check if user has admin privileges", skip(pool))]
+pub async fn is_admin_user(user_id: Uuid, pool: &PgPool) -> Result<bool, anyhow::Error> {
+    let record = sqlx::query!(
+        r#"
+        SELECT is_admin
+        FROM users
+        WHERE id = $1
+        "#,
+        user_id
+    )
+    .fetch_optional(pool)
+    .await
+    .context("Failed to fetch admin flag for user")?;
+
+    let is_admin = record
+        .map(|r| r.is_admin)
+        .ok_or_else(|| anyhow::anyhow!("No user found"))?;
+
+    Ok(is_admin)
 }

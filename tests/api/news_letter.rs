@@ -1,5 +1,4 @@
 use crate::helpers::{ConfirmationLinks, TestApp, TestUser, spawn_app};
-use uuid::Uuid;
 use wiremock::matchers::{any, method, path};
 use wiremock::{Mock, ResponseTemplate};
 
@@ -8,23 +7,23 @@ async fn newsletters_are_not_delivered_to_inactivated_user() {
     let app = spawn_app().await;
     create_inactivated_user(&app).await;
 
+    app.login_admin().await;
+
     Mock::given(any())
         .respond_with(ResponseTemplate::new(200))
-        // Assert that no request is fired at Postmark except for test user and admin user we created initially
-        .expect(2)
+        .expect(2) // seeded admin + test user
         .mount(&app.email_server)
         .await;
 
-    let newsletter_request_body = serde_json::json!({
-    "title": "Newsletter title",
-    "content": {
-    "text": "Newsletter body as plain text",
-    "html": "<p>Newsletter body as HTML</p>",
-    }
+    let body = serde_json::json!({
+        "title": "Newsletter title",
+        "content": {
+            "text": "Plain text",
+            "html": "<p>HTML</p>"
+        }
     });
 
-    let response = app.publish_newsletters(newsletter_request_body).await;
-
+    let response = app.publish_newsletters(body).await;
     assert_eq!(response.status().as_u16(), 200);
 }
 
@@ -33,25 +32,87 @@ async fn newsletters_are_delivered_to_confirmed_users() {
     let app = spawn_app().await;
     create_activated_user(&app).await;
 
+    app.login_admin().await;
+
     Mock::given(path("/email"))
         .and(method("POST"))
         .respond_with(ResponseTemplate::new(200))
-        // Assert that 3 requests are fired at Postmark including the test user and admin user we created initially
-        .expect(3)
+        .expect(3) // seeded admin + test user + new confirmed user
         .mount(&app.email_server)
         .await;
 
-    let newsletter_request_body = serde_json::json!({
-    "title": "Newsletter title",
-    "content": {
-    "text": "Newsletter body as plain text",
-    "html": "<p>Newsletter body as HTML</p>",
-    }
+    let body = serde_json::json!({
+        "title": "Newsletter title",
+        "content": {
+            "text": "Plain text",
+            "html": "<p>HTML</p>"
+        }
     });
 
-    let response = app.publish_newsletters(newsletter_request_body).await;
-
+    let response = app.publish_newsletters(body).await;
     assert_eq!(response.status().as_u16(), 200);
+}
+
+#[tokio::test]
+async fn newsletters_returns_400_for_invalid_data() {
+    let app = spawn_app().await;
+    app.login_admin().await;
+
+    let invalid_cases = vec![
+        (
+            serde_json::json!({ "content": { "text": "Body", "html": "<p>HTML</p>" } }),
+            "missing title",
+        ),
+        (
+            serde_json::json!({ "title": "Newsletter!" }),
+            "missing content",
+        ),
+    ];
+
+    for (invalid_body, desc) in invalid_cases {
+        let response = app.publish_newsletters(invalid_body).await;
+        assert_eq!(
+            400,
+            response.status().as_u16(),
+            "Did not return 400 when payload was {desc}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn non_admins_are_rejected_to_publish_newsletters() {
+    let app = spawn_app().await;
+    app.login(&serde_json::json!({
+        "username": &app.test_user.username,
+        "password": &app.test_user.password
+    }))
+    .await;
+
+    let body = serde_json::json!({
+        "title": "Newsletter title",
+        "content": {
+            "text": "Plain text",
+            "html": "<p>HTML</p>"
+        }
+    });
+
+    let response = app.publish_newsletters(body).await;
+    assert_eq!(response.status().as_u16(), 403);
+}
+
+#[tokio::test]
+async fn anonymous_users_cannot_publish_newsletters() {
+    let app = spawn_app().await;
+    let body = serde_json::json!({
+        "title": "Unauthorized attempt",
+        "content": {
+            "text": "Plain text",
+            "html": "<p>HTML</p>"
+        }
+    });
+
+    let response = app.publish_newsletters(body).await;
+    assert_eq!(response.status().as_u16(), 401);
 }
 
 async fn create_inactivated_user(app: &TestApp) -> ConfirmationLinks {
@@ -93,116 +154,4 @@ async fn create_activated_user(app: &TestApp) {
         .unwrap()
         .error_for_status()
         .unwrap();
-}
-
-#[tokio::test]
-async fn newsletters_returns_400_for_invalid_data() {
-    let app = spawn_app().await;
-    let test_cases = vec![
-        (
-            serde_json::json!({
-            "content": {
-            "text": "Newsletter body as plain text",
-            "html": "<p>Newsletter body as HTML</p>",
-            }
-            }),
-            "missing title",
-        ),
-        (
-            serde_json::json!({"title": "Newsletter!"}),
-            "missing content",
-        ),
-    ];
-    for (invalid_body, _error_message) in test_cases {
-        let response = app.publish_newsletters(invalid_body).await;
-
-        assert_eq!(
-            400,
-            response.status().as_u16(),
-            "The API did not fail with 400 Bad Request when the payload was {_error_message}."
-        );
-    }
-}
-
-#[tokio::test]
-async fn requests_missing_authorization_are_rejected_to_publish_newsletters() {
-    let app = spawn_app().await;
-
-    let newsletter_request_body = serde_json::json!({
-    "title": "Newsletter title",
-    "content": {
-    "text": "Newsletter body as plain text",
-    "html": "<p>Newsletter body as HTML</p>",
-    }
-    });
-    let response = app
-        .publish_newsletters_unauthorized(newsletter_request_body)
-        .await;
-
-    assert_eq!(401, response.status().as_u16());
-    assert_eq!(
-        r#"Basic realm="publish""#,
-        response.headers()["WWW-Authenticate"]
-    );
-}
-
-#[tokio::test]
-async fn non_existing_user_is_rejected_to_publish_newsletters() {
-    // Arrange
-    let app = spawn_app().await;
-    // Random credentials
-    let username = Uuid::new_v4().to_string();
-    let password = Uuid::new_v4().to_string();
-
-    let address = &app.address;
-    let response = reqwest::Client::new()
-        .post(format!("{address}/newsletters/publish"))
-        .basic_auth(username, Some(password))
-        .json(&serde_json::json!({
-        "title": "Newsletter title",
-        "content": {
-        "text": "Newsletter body as plain text",
-        "html": "<p>Newsletter body as HTML</p>",
-        }
-        }))
-        .send()
-        .await
-        .expect("Failed to execute request.");
-    // Assert
-    assert_eq!(401, response.status().as_u16());
-    assert_eq!(
-        r#"Basic realm="publish""#,
-        response.headers()["WWW-Authenticate"]
-    );
-}
-
-#[tokio::test]
-async fn user_with_invalid_password_is_rejected_to_publish_newsletters() {
-    // Arrange
-    let app = spawn_app().await;
-    let username = &app.test_user.username;
-    // Random password
-    let password = Uuid::new_v4().to_string();
-
-    let address = &app.address;
-    assert_ne!(app.test_user.password, password);
-    let response = reqwest::Client::new()
-        .post(format!("{address}/newsletters/publish"))
-        .basic_auth(username, Some(password))
-        .json(&serde_json::json!({
-        "title": "Newsletter title",
-        "content": {
-        "text": "Newsletter body as plain text",
-        "html": "<p>Newsletter body as HTML</p>",
-        }
-        }))
-        .send()
-        .await
-        .expect("Failed to execute request.");
-    // Assert
-    assert_eq!(401, response.status().as_u16());
-    assert_eq!(
-        r#"Basic realm="publish""#,
-        response.headers()["WWW-Authenticate"]
-    );
 }

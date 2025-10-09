@@ -35,6 +35,20 @@ test-log-debug:
 	@echo "Running cargo test with bunyan formatted logs in debug mode..."
 	@export RUST_LOG="sqlx=error,debug" && export TEST_LOG=true && cargo test | bunyan
 
+# Test log debug command: performs check, format, then runs tests with bunyan logging
+# Usage: make test-single name=your_test_name
+test-single:
+	@if [ -z "$(name)" ]; then \
+		echo "Error: please provide a test name, e.g.:"; \
+		echo "   make test-single name=logout_clears_session_state"; \
+		exit 1; \
+	fi
+	@echo "Running cargo check..."
+	cargo check
+	@echo "Running cargo fmt..."
+	cargo fmt
+	@echo "Running cargo test for '$(name)' with bunyan formatted logs in debug mode..."
+	@export RUST_LOG="sqlx=error,debug" && export TEST_LOG=true && cargo test $(name) -- --nocapture | bunyan
 
 # Create new migration file
 migrate-add:
