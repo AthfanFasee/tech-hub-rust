@@ -74,3 +74,44 @@ async fn current_password_must_be_valid() {
         "The API did not respond with 401 status upon current password is wrong."
     );
 }
+
+#[tokio::test]
+async fn changing_password_works() {
+    let app = spawn_app().await;
+    let new_password = Uuid::new_v4().to_string();
+
+    //  Login
+    let login_body = serde_json::json!({
+    "username": &app.test_user.username,
+    "password": &app.test_user.password
+    });
+    let response = app.login(&login_body).await;
+    assert_eq!(response.status().as_u16(), 200);
+
+    // Change password
+    let response = app
+        .change_password(&serde_json::json!({
+        "current_password": &app.test_user.password,
+        "new_password": &new_password,
+        "new_password_check": &new_password,
+        }))
+        .await;
+    assert_eq!(response.status().as_u16(), 200);
+
+    // Logout
+    let response = app.logout().await;
+    assert_eq!(response.status().as_u16(), 200);
+
+    //  Login using the new password
+    let login_body = serde_json::json!({
+    "username": &app.test_user.username,
+    "password": &new_password
+    });
+
+    let response = app.login(&login_body).await;
+    assert_eq!(response.status().as_u16(), 200);
+
+    // Access protected endpoint
+    let response = app.access_protected_endpoint().await;
+    assert_eq!(response.status().as_u16(), 200);
+}

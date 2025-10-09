@@ -99,11 +99,12 @@ pub async fn change_password(
         ));
     };
 
+    crate::authentication::change_password(user_id, new_password, &pool).await?;
+
     let success = SuccessResponse {
         code: 200,
         message: "Password changed successfully".to_string(),
     };
-
     Ok(HttpResponse::Ok().json(success))
 }
 
