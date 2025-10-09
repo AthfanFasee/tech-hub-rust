@@ -130,8 +130,33 @@ impl TestApp {
 
     pub async fn login(&self, payload: &Value) -> reqwest::Response {
         self.api_client
-            .post(&format!("{}/login", &self.address))
+            .post(&format!("{}/user/login", &self.address))
             .json(&payload)
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
+
+    pub async fn change_password(&self, payload: &Value) -> reqwest::Response {
+        self.api_client
+            .post(&format!("{}/user/reset-password", &self.address))
+            .json(&payload)
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
+
+    pub async fn logout(&self) -> reqwest::Response {
+        self.api_client
+            .post(&format!("{}/user/logout", &self.address))
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
+
+    pub async fn access_protected_endpoint(&self) -> reqwest::Response {
+        self.api_client
+            .get(&format!("{}/protected", &self.address))
             .send()
             .await
             .expect("Failed to execute request.")
@@ -183,13 +208,18 @@ pub async fn spawn_app() -> TestApp {
     let application_port = application.port();
     let _ = tokio::spawn(application.run_until_stopped());
 
+    let client = reqwest::Client::builder()
+        .cookie_store(true)
+        .build()
+        .unwrap();
+
     let test_app = TestApp {
         address: format!("http://localhost:{}", application_port),
         port: application_port,
         db_pool: get_connection_pool(&configuration.database),
         email_server,
         test_user: TestUser::generate(),
-        api_client: reqwest::Client::new(),
+        api_client: client,
     };
 
     test_app.test_user.store(&test_app.db_pool).await;

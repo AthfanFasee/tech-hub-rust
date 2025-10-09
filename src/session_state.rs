@@ -24,6 +24,10 @@ impl TypedSession {
             .get(Self::USER_ID_KEY)
             .context("Failed to get user id from the session")
     }
+
+    pub fn log_out(self) {
+        self.0.purge()
+    }
 }
 
 impl FromRequest for TypedSession {

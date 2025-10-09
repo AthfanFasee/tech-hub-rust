@@ -1,6 +1,9 @@
 use crate::configuration::{Configuration, DatabaseConfigs};
 use crate::email_client::EmailClient;
-use crate::routes::{confirm_user, health_check, login, publish_newsletter, register_user};
+use crate::routes::{
+    change_password, confirm_user, health_check, log_out, login, protected_endpoint,
+    publish_newsletter, register_user,
+};
 use actix_session::SessionMiddleware;
 use actix_session::storage::RedisSessionStore;
 use actix_web::dev::Server;
@@ -95,9 +98,12 @@ async fn run(
                 secret_key.clone(),
             ))
             .route("/health_check", web::get().to(health_check))
-            .route("/login", web::post().to(login))
+            .route("/user/login", web::post().to(login))
             .route("/user/register", web::post().to(register_user))
+            .route("/user/reset-password", web::post().to(change_password))
             .route("/user/confirm", web::get().to(confirm_user))
+            .route("/user/logout", web::post().to(log_out))
+            .route("/protected", web::get().to(protected_endpoint))
             .route("/newsletters/publish", web::post().to(publish_newsletter))
             // register the db connection as part of the application state
             .app_data(db_pool.clone())

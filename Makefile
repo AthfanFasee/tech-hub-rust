@@ -32,7 +32,7 @@ test-log-debug:
 	cargo check
 	@echo "Running cargo fmt..."
 	cargo fmt
-	@echo "Running cargo test with bunyan formatted logs..."
+	@echo "Running cargo test with bunyan formatted logs in debug mode..."
 	@export RUST_LOG="sqlx=error,debug" && export TEST_LOG=true && cargo test | bunyan
 
 

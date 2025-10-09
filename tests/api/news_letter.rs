@@ -10,8 +10,8 @@ async fn newsletters_are_not_delivered_to_inactivated_user() {
 
     Mock::given(any())
         .respond_with(ResponseTemplate::new(200))
-        // Assert that no request is fired at Postmark except for test user we created initially
-        .expect(1)
+        // Assert that no request is fired at Postmark except for test user and admin user we created initially
+        .expect(2)
         .mount(&app.email_server)
         .await;
 
@@ -36,8 +36,8 @@ async fn newsletters_are_delivered_to_confirmed_users() {
     Mock::given(path("/email"))
         .and(method("POST"))
         .respond_with(ResponseTemplate::new(200))
-        // Assert that 2 requests are fired at Postmark including the test user we created initially
-        .expect(2)
+        // Assert that 3 requests are fired at Postmark including the test user and admin user we created initially
+        .expect(3)
         .mount(&app.email_server)
         .await;
 
