@@ -38,6 +38,36 @@ async fn login_returns_unauthorized_for_invalid_username_or_password() {
 }
 
 #[tokio::test]
+async fn login_does_not_leak_internal_error_details_on_auth_failure() {
+    let app = spawn_app().await;
+
+    // Use a valid username but wrong password
+    let payload = serde_json::json!({
+        "username": &app.test_user.username,
+        "password": "wrong-password-123",
+    });
+
+    let response = app.login(&payload).await;
+
+    assert_eq!(
+        401,
+        response.status().as_u16(),
+        "Expected 401 for invalid credentials."
+    );
+
+    // response body should not leak details like 'Invalid password'
+    let body = response.text().await.unwrap();
+    assert!(
+        !body.contains("Invalid password"),
+        "Response leaked specific password-related message: {body}"
+    );
+    assert!(
+        !body.contains("hash"),
+        "Response leaked sensitive error details: {body}"
+    );
+}
+
+#[tokio::test]
 async fn logout_clears_session_state() {
     let app = spawn_app().await;
 

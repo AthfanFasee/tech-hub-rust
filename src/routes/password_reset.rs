@@ -1,6 +1,6 @@
+use crate::authentication::UserId;
 use crate::authentication::{AuthError, Credentials, validate_credentials};
 use crate::routes::{build_error_response, error_chain_fmt};
-use crate::session_state::TypedSession;
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, ResponseError, web};
 use anyhow::Context;
@@ -54,19 +54,10 @@ pub struct PasswordResetData {
 pub async fn change_password(
     payload: web::Json<PasswordResetData>,
     pool: web::Data<PgPool>,
-    session: TypedSession,
+    user_id: web::ReqData<UserId>,
 ) -> Result<HttpResponse, PasswordResetError> {
-    let user_id = session.get_user_id()?;
-
-    if user_id.is_none() {
-        return Err(PasswordResetError::AuthError(anyhow::anyhow!(
-            "User not logged in"
-        )));
-    };
-
-    let user_id = user_id.unwrap();
-
-    let username = get_username(user_id, &pool).await?;
+    let user_id = user_id.into_inner();
+    let username = get_username(*user_id, &pool).await?;
 
     let PasswordResetData {
         current_password,
@@ -99,7 +90,7 @@ pub async fn change_password(
         ));
     };
 
-    crate::authentication::change_password(user_id, new_password, &pool).await?;
+    crate::authentication::change_password(*user_id, new_password, &pool).await?;
 
     let success = SuccessResponse {
         code: 200,

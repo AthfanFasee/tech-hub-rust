@@ -68,7 +68,6 @@ fn verify_password_hash(
             password_candidate.expose_secret().as_bytes(),
             &expected_password_hash,
         )
-        // TODO later when writing test, write one to make sure client doesn't get "Invalid password." in response body rather just "Invalid Credentials".
         .context("Invalid password.")
         .map_err(AuthError::InvalidCredentials)
 }

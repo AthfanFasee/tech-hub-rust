@@ -1,3 +1,4 @@
+use crate::authentication::reject_anonymous_users;
 use crate::configuration::{Configuration, DatabaseConfigs};
 use crate::email_client::EmailClient;
 use crate::routes::{
@@ -7,6 +8,7 @@ use crate::routes::{
 use actix_session::SessionMiddleware;
 use actix_session::storage::RedisSessionStore;
 use actix_web::dev::Server;
+use actix_web::middleware::from_fn;
 use actix_web::{App, HttpServer, web};
 use anyhow::Context;
 use secrecy::{ExposeSecret, Secret};
@@ -100,11 +102,16 @@ async fn run(
             .route("/health_check", web::get().to(health_check))
             .route("/user/login", web::post().to(login))
             .route("/user/register", web::post().to(register_user))
-            .route("/user/reset-password", web::post().to(change_password))
             .route("/user/confirm", web::get().to(confirm_user))
-            .route("/user/logout", web::post().to(log_out))
-            .route("/protected", web::get().to(protected_endpoint))
-            .route("/newsletters/publish", web::post().to(publish_newsletter))
+            // these routes go through the authentication middleware
+            .service(
+                web::scope("")
+                    .wrap(from_fn(reject_anonymous_users))
+                    .route("/user/reset-password", web::post().to(change_password))
+                    .route("/user/logout", web::post().to(log_out))
+                    .route("/protected", web::get().to(protected_endpoint))
+                    .route("/newsletters/publish", web::post().to(publish_newsletter)),
+            )
             // register the db connection as part of the application state
             .app_data(db_pool.clone())
             .app_data(email_client.clone())

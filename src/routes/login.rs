@@ -69,21 +69,10 @@ pub async fn login(
 }
 
 pub async fn log_out(session: TypedSession) -> Result<HttpResponse, LoginError> {
-    if session.get_user_id()?.is_none() {
-        Err(LoginError::AuthError(anyhow::anyhow!("User not logged in")))
-    } else {
-        session.log_out();
-        Ok(HttpResponse::Ok().finish())
-    }
+    session.log_out();
+    Ok(HttpResponse::Ok().finish())
 }
 
-// for testing purposes
-pub async fn protected_endpoint(session: TypedSession) -> Result<HttpResponse, LoginError> {
-    let user_id = session.get_user_id()?;
-
-    if user_id.is_none() {
-        return Err(LoginError::AuthError(anyhow::anyhow!("User not logged in")));
-    }
-
+pub async fn protected_endpoint() -> Result<HttpResponse, LoginError> {
     Ok(HttpResponse::Ok().finish())
 }
