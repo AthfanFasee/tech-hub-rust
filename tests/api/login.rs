@@ -10,7 +10,7 @@ async fn login_returns_success_for_valid_username_and_password() {
     "password": &app.test_user.password
     });
 
-    let response = app.login(&payload).await;
+    let response = app.login_custom_credentials(&payload).await;
 
     assert_eq!(
         200,
@@ -28,7 +28,7 @@ async fn login_returns_unauthorized_for_invalid_username_or_password() {
     "password": Uuid::new_v4().to_string()
     });
 
-    let response = app.login(&payload).await;
+    let response = app.login_custom_credentials(&payload).await;
 
     assert_eq!(
         401,
@@ -44,11 +44,10 @@ async fn login_does_not_leak_internal_error_details_on_auth_failure() {
     // Use a valid username but wrong password
     let payload = serde_json::json!({
         "username": &app.test_user.username,
-        "password": "wrong-password-123",
+        "password": Uuid::new_v4().to_string(),
     });
 
-    let response = app.login(&payload).await;
-
+    let response = app.login_custom_credentials(&payload).await;
     assert_eq!(
         401,
         response.status().as_u16(),
@@ -70,21 +69,11 @@ async fn login_does_not_leak_internal_error_details_on_auth_failure() {
 #[tokio::test]
 async fn logout_clears_session_state() {
     let app = spawn_app().await;
+    app.login().await;
 
-    // Login
-    let login_body = serde_json::json!({
-        "username": &app.test_user.username,
-        "password": &app.test_user.password
-    });
-
-    let response = app.login(&login_body).await;
-    assert_eq!(response.status().as_u16(), 200);
-
-    // Access protected endpoint
     let response = app.access_protected_endpoint().await;
     assert_eq!(response.status().as_u16(), 200);
 
-    // Logout
     let response = app.logout().await;
     assert_eq!(response.status().as_u16(), 200);
 
@@ -93,6 +82,6 @@ async fn logout_clears_session_state() {
     assert_eq!(
         response.status().as_u16(),
         401,
-        "Expected 401 Unauthorized after logout from protected endpoint"
+        "Expected 401 Unauthorized after logout when accessing protected endpoint"
     );
 }

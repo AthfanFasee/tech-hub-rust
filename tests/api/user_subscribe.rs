@@ -5,14 +5,7 @@ use wiremock::{Mock, ResponseTemplate};
 #[tokio::test]
 async fn the_link_sent_by_send_subscribe_email_returns_a_200_if_called() {
     let app = spawn_app().await;
-
-    //  Login
-    let login_body = serde_json::json!({
-    "username": &app.test_user.username,
-    "password": &app.test_user.password
-    });
-    let response = app.login(&login_body).await;
-    assert_eq!(response.status().as_u16(), 200);
+    app.login().await;
 
     Mock::given(path("/email"))
         .and(method("POST"))
@@ -26,21 +19,13 @@ async fn the_link_sent_by_send_subscribe_email_returns_a_200_if_called() {
     let confirmation_links = app.get_confirmation_links(email_request);
 
     let response = reqwest::get(confirmation_links.html).await.unwrap();
-
     assert_eq!(response.status().as_u16(), 200);
 }
 
 #[tokio::test]
 async fn clicking_on_the_confirm_subscription_link_subscribes_a_user_in_db() {
     let app = spawn_app().await;
-
-    //  Login
-    let login_body = serde_json::json!({
-    "username": &app.test_user.username,
-    "password": &app.test_user.password
-    });
-    let response = app.login(&login_body).await;
-    assert_eq!(response.status().as_u16(), 200);
+    app.login().await;
 
     Mock::given(path("/email"))
         .and(method("POST"))
@@ -50,9 +35,10 @@ async fn clicking_on_the_confirm_subscription_link_subscribes_a_user_in_db() {
 
     app.send_subscribe_email().await;
 
-    //  Logout as the user who clicks link in their email won't be logged in
+    // Stimulate that user will be clicking confirmation email outside our app by logging out
     app.logout().await;
 
+    // Extract confirmation link and "click" it
     let email_request = &app.email_server.received_requests().await.unwrap()[0];
     let confirmation_links = app.get_confirmation_links(email_request);
 
@@ -61,7 +47,6 @@ async fn clicking_on_the_confirm_subscription_link_subscribes_a_user_in_db() {
         .unwrap()
         .error_for_status()
         .unwrap();
-
     assert_eq!(response.status().as_u16(), 200);
 
     let saved = sqlx::query!(
@@ -87,7 +72,6 @@ async fn subscribe_user_requests_without_token_are_rejected_with_a_400() {
     let response = reqwest::get(&format!("{}/user/confirm/subscribe", app.address))
         .await
         .unwrap();
-
     assert_eq!(response.status().as_u16(), 400);
 }
 
@@ -101,19 +85,13 @@ async fn subscribe_user_with_invalid_token_returns_401() {
     ))
     .await
     .unwrap();
-
     assert_eq!(response.status().as_u16(), 401);
 }
 
 #[tokio::test]
 async fn subscription_token_is_deleted_after_successful_subscription() {
     let app = spawn_app().await;
-
-    app.login(&serde_json::json!({
-        "username": &app.test_user.username,
-        "password": &app.test_user.password
-    }))
-    .await;
+    app.login().await;
 
     Mock::given(path("/email"))
         .and(method("POST"))
@@ -142,12 +120,7 @@ async fn subscription_token_is_deleted_after_successful_subscription() {
 #[tokio::test]
 async fn send_subscribe_email_returns_500_if_email_sending_fails() {
     let app = spawn_app().await;
-
-    app.login(&serde_json::json!({
-        "username": &app.test_user.username,
-        "password": &app.test_user.password
-    }))
-    .await;
+    app.login().await;
 
     Mock::given(path("/email"))
         .and(method("POST"))
@@ -156,6 +129,5 @@ async fn send_subscribe_email_returns_500_if_email_sending_fails() {
         .await;
 
     let response = app.send_subscribe_email().await;
-
     assert_eq!(response.status().as_u16(), 500);
 }

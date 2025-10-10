@@ -5,6 +5,7 @@ use wiremock::{Mock, ResponseTemplate};
 #[tokio::test]
 async fn the_link_returned_by_add_user_returns_a_200_if_called() {
     let app = spawn_app().await;
+
     let user = TestUser::generate();
     let payload = serde_json::json!({
         "name": user.username,
@@ -30,6 +31,7 @@ async fn the_link_returned_by_add_user_returns_a_200_if_called() {
 #[tokio::test]
 async fn clicking_on_the_confirmation_link_activates_a_user_in_db() {
     let app = spawn_app().await;
+
     let user = TestUser::generate();
     let payload = serde_json::json!({
         "name": user.username,
@@ -52,7 +54,6 @@ async fn clicking_on_the_confirmation_link_activates_a_user_in_db() {
         .unwrap()
         .error_for_status()
         .unwrap();
-
     assert_eq!(response.status().as_u16(), 200);
 
     let saved = sqlx::query!(

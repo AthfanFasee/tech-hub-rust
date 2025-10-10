@@ -108,22 +108,54 @@ impl TestApp {
             .expect("Failed to execute request: add_user")
     }
 
-    pub async fn publish_newsletters(&self, payload: Value) -> reqwest::Response {
+    pub async fn publish_newsletters(&self, payload: &Value) -> reqwest::Response {
         self.api_client
             .post(&format!("{}/admin/newsletters/publish", &self.address))
-            .json(&payload)
+            .json(payload)
             .send()
             .await
             .expect("Failed to execute request.")
     }
 
-    pub async fn login(&self, payload: &Value) -> reqwest::Response {
+    pub async fn login(&self) {
+        let login_body = serde_json::json!({
+        "username": &self.test_user.username,
+        "password": &self.test_user.password
+        });
+
+        let response = self
+            .api_client
+            .post(&format!("{}/user/login", &self.address))
+            .json(&login_body)
+            .send()
+            .await
+            .expect("Failed to execute request.");
+        assert_eq!(response.status().as_u16(), 200);
+    }
+
+    pub async fn login_custom_credentials(&self, payload: &Value) -> reqwest::Response {
         self.api_client
             .post(&format!("{}/user/login", &self.address))
             .json(payload)
             .send()
             .await
             .expect("Failed to execute request.")
+    }
+
+    pub async fn login_admin(&self) {
+        let login_body = serde_json::json!({
+            "username": "athfan",
+            "password": "athfan123"
+        });
+
+        let response = self
+            .api_client
+            .post(&format!("{}/user/login", &self.address))
+            .json(&login_body)
+            .send()
+            .await
+            .expect("Failed to execute request.");
+        assert_eq!(response.status().as_u16(), 200);
     }
 
     pub async fn change_password(&self, payload: &Value) -> reqwest::Response {
@@ -157,16 +189,6 @@ impl TestApp {
             .send()
             .await
             .expect("Failed to execute request.")
-    }
-
-    pub async fn login_admin(&self) {
-        let login_body = serde_json::json!({
-            "username": "athfan",
-            "password": "athfan123"
-        });
-
-        let response = self.login(&login_body).await;
-        assert_eq!(response.status().as_u16(), 200);
     }
 }
 
