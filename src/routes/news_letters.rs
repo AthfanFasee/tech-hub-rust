@@ -57,7 +57,7 @@ pub async fn publish_newsletter(
     user_id: web::ReqData<UserId>,
 ) -> Result<HttpResponse, PublishError> {
     tracing::Span::current().record("user_id", tracing::field::display(*user_id));
-    let users = get_activated_users(&pool).await?;
+    let users = get_subscribed_users(&pool).await?;
     for user in users {
         match user {
             Ok(user) => {
@@ -92,14 +92,14 @@ struct ConfirmedUser {
 }
 
 #[tracing::instrument(name = "Get activated users", skip_all)]
-async fn get_activated_users(
+async fn get_subscribed_users(
     pool: &PgPool,
 ) -> Result<Vec<Result<ConfirmedUser, anyhow::Error>>, anyhow::Error> {
     let rows = sqlx::query!(
         r#"
         SELECT email
         FROM users
-        WHERE is_activated = true
+        WHERE is_activated = true and is_subscribed = true
         "#,
     )
     .fetch_all(pool)
