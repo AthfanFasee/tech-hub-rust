@@ -6,7 +6,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 #[derive(serde::Deserialize)]
-pub struct Parameters {
+pub struct ActivationParameters {
     token: String,
 }
 
@@ -38,7 +38,7 @@ impl ResponseError for UserConfirmError {
 #[tracing::instrument(name = "Confirm a pending user activation", skip(parameters, pool))]
 
 pub async fn confirm_user(
-    parameters: web::Query<Parameters>,
+    parameters: web::Query<ActivationParameters>,
     pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, UserConfirmError> {
     let user_id = get_user_id_from_token(&pool, &parameters.token)

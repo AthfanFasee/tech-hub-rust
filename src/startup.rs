@@ -3,7 +3,7 @@ use crate::configuration::{Configuration, DatabaseConfigs};
 use crate::email_client::EmailClient;
 use crate::routes::{
     change_password, confirm_user, health_check, log_out, login, protected_endpoint,
-    publish_newsletter, register_user,
+    publish_newsletter, register_user, send_subscribe_email, subscribe_user,
 };
 use actix_session::SessionMiddleware;
 use actix_session::storage::RedisSessionStore;
@@ -103,12 +103,14 @@ async fn run(
             .route("/user/login", web::post().to(login))
             .route("/user/register", web::post().to(register_user))
             .route("/user/confirm", web::get().to(confirm_user))
+            .route("/user/confirm/subscribe", web::get().to(subscribe_user))
             // these routes go through the authentication middleware
             .service(
                 web::scope("/user")
                     .wrap(from_fn(reject_anonymous_users))
                     .route("/reset-password", web::post().to(change_password))
                     .route("/logout", web::post().to(log_out))
+                    .route("/email/subscribe", web::get().to(send_subscribe_email))
                     .route("/protected", web::get().to(protected_endpoint)),
             )
             .service(

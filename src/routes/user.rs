@@ -2,13 +2,12 @@ use crate::domain::{NewUser, UserEmail, UserName};
 use crate::email_client::EmailClient;
 use crate::email_client::EmailError;
 use crate::startup::ApplicationBaseUrl;
+use crate::utils::generate_token;
 use crate::{build_error_response, error_chain_fmt};
 use actix_web::ResponseError;
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, web};
 use anyhow::Context;
-use rand::distributions::Alphanumeric;
-use rand::{Rng, thread_rng};
 use serde::Deserialize;
 use serde::Serialize;
 use sqlx::{Executor, PgPool, Postgres, Transaction};
@@ -130,7 +129,7 @@ pub async fn insert_user(
         user_id,
         new_user.name.as_ref(),
         new_user.email.as_ref(),
-        "dummy_hash",
+        "dummy_hash"
     );
 
     transaction.execute(query).await?;
@@ -163,7 +162,7 @@ pub async fn send_confirmation_email(
 ) -> Result<(), EmailError> {
     let confirmation_link = format!("{base_url}/user/confirm?token={token}");
     let plain_body =
-        format!("Welcome to TechHub!\nVisit {confirmation_link} to confirm your subscription.",);
+        format!("Welcome to TechHub!\nVisit {confirmation_link} to confirm your registration.",);
     let html_body = format!(
         "Welcome to TechHub!<br />\
         Click <a href=\"{confirmation_link}\">here</a> to confirm your subscription.",
@@ -171,13 +170,4 @@ pub async fn send_confirmation_email(
     email_client
         .send_email(&new_user.email, "Welcome!", &html_body, &plain_body)
         .await
-}
-
-// Generate a random 25-characters-long case-sensitive token.
-fn generate_token() -> String {
-    let mut rng = thread_rng();
-    std::iter::repeat_with(|| rng.sample(Alphanumeric))
-        .map(char::from)
-        .take(25)
-        .collect()
 }

@@ -1,3 +1,9 @@
+use actix_web::HttpResponse;
+use actix_web::http::StatusCode;
+use rand::distributions::Alphanumeric;
+use rand::{Rng, thread_rng};
+use serde::Serialize;
+
 #[derive(Serialize)]
 pub struct ErrorResponse {
     pub code: u16,
@@ -40,6 +46,11 @@ where
     actix_web::error::ErrorInternalServerError(e)
 }
 
-use actix_web::HttpResponse;
-use actix_web::http::StatusCode;
-use serde::Serialize;
+// Generate a random 25-characters-long case-sensitive token.
+pub fn generate_token() -> String {
+    let mut rng = thread_rng();
+    std::iter::repeat_with(|| rng.sample(Alphanumeric))
+        .map(char::from)
+        .take(25)
+        .collect()
+}

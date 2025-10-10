@@ -3,14 +3,14 @@ use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version};
 use secrecy::Secret;
 use serde_json::Value;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
-use std::sync::LazyLock;
+use std::sync::OnceLock;
 use techhub::configuration::{DatabaseConfigs, get_config};
-use techhub::startup::Application;
-use techhub::startup::get_connection_pool;
+use techhub::startup::{Application, get_connection_pool};
 use techhub::telemetry;
 use uuid::Uuid;
 use wiremock::MockServer;
 
+#[derive(Debug)]
 pub struct TestUser {
     pub user_id: Uuid,
     pub username: String,
@@ -29,21 +29,19 @@ impl TestUser {
         }
     }
 
-    async fn store(&self, pool: &PgPool) {
+    pub async fn store(&self, pool: &PgPool) -> Result<(), sqlx::Error> {
         let salt = SaltString::generate(&mut rand::thread_rng());
 
-        let password_hash = Argon2::new(
-            Algorithm::Argon2id,
-            Version::V0x13,
-            Params::new(15000, 2, 1, None).unwrap(),
-        )
-        .hash_password(self.password.as_bytes(), &salt)
-        .unwrap()
-        .to_string();
+        // Use lighter parameters for test performance
+        let test_params = Params::new(100, 1, 1, None).unwrap();
+        let password_hash = Argon2::new(Algorithm::Argon2id, Version::V0x13, test_params)
+            .hash_password(self.password.as_bytes(), &salt)
+            .unwrap()
+            .to_string();
 
         sqlx::query!(
-            "INSERT INTO users (id, name, password_hash, email, is_activated)
-            VALUES ($1, $2, $3, $4, $5)",
+            r#"INSERT INTO users (id, name, password_hash, email, is_activated)
+            VALUES ($1, $2, $3, $4, $5)"#,
             self.user_id,
             self.username,
             password_hash,
@@ -51,11 +49,13 @@ impl TestUser {
             true,
         )
         .execute(pool)
-        .await
-        .expect("Failed to store test user");
+        .await?;
+
+        Ok(())
     }
 }
 
+#[derive(Debug)]
 pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,
@@ -93,14 +93,14 @@ impl TestApp {
             confirmation_link
         };
 
-        let html = get_link(&body["HtmlBody"].as_str().unwrap());
-        let plain_text = get_link(&body["TextBody"].as_str().unwrap());
+        let html = get_link(body["HtmlBody"].as_str().unwrap());
+        let plain_text = get_link(body["TextBody"].as_str().unwrap());
         ConfirmationLinks { html, plain_text }
     }
 
     pub async fn register_user(&self, payload: &Value) -> reqwest::Response {
         self.api_client
-            .post(&format!("{}/user/register", self.address))
+            .post(&format!("{}/user/register", &self.address))
             .header(reqwest::header::CONTENT_TYPE, "application/json")
             .json(payload)
             .send()
@@ -120,7 +120,7 @@ impl TestApp {
     pub async fn login(&self, payload: &Value) -> reqwest::Response {
         self.api_client
             .post(&format!("{}/user/login", &self.address))
-            .json(&payload)
+            .json(payload)
             .send()
             .await
             .expect("Failed to execute request.")
@@ -151,6 +151,14 @@ impl TestApp {
             .expect("Failed to execute request.")
     }
 
+    pub async fn send_subscribe_email(&self) -> reqwest::Response {
+        self.api_client
+            .get(&format!("{}/user/email/subscribe", &self.address))
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
+
     pub async fn login_admin(&self) {
         let login_body = serde_json::json!({
             "username": "athfan",
@@ -162,27 +170,36 @@ impl TestApp {
     }
 }
 
-// Ensure that the `tracing` stack is only initialised once using `LazyLock`
-static TRACING: LazyLock<()> = LazyLock::new(|| {
-    let default_filter_level = "info".to_string();
-    let subscriber_name = "test".to_string();
+// Ensure that the `tracing` stack is only initialised once using `OnceLock`
+static TRACING: OnceLock<()> = OnceLock::new();
 
-    // If TEST_LOG env variable is set then output the logs to std out while running tests. Otherwise skip
-    if std::env::var("TEST_LOG").is_ok() {
-        let subscriber =
-            telemetry::get_subscriber(subscriber_name, default_filter_level, std::io::stdout);
-        telemetry::init_subscriber(subscriber);
-    } else {
-        let subscriber =
-            telemetry::get_subscriber(subscriber_name, default_filter_level, std::io::sink);
-        telemetry::init_subscriber(subscriber);
-    };
-});
+pub fn init_tracing() {
+    TRACING.get_or_init(|| {
+        let default_filter_level = "info".to_string();
+        let subscriber_name = "test".to_string();
+
+        // If TEST_LOG env variable is set then output the logs to stdout while running tests
+        if std::env::var("TEST_LOG").is_ok() {
+            let subscriber = telemetry::get_subscriber(
+                subscriber_name.clone(),
+                default_filter_level.clone(),
+                std::io::stdout,
+            );
+            telemetry::init_subscriber(subscriber);
+        } else {
+            let subscriber = telemetry::get_subscriber(
+                subscriber_name.clone(),
+                default_filter_level.clone(),
+                std::io::sink,
+            );
+            telemetry::init_subscriber(subscriber);
+        };
+    });
+}
 
 pub async fn spawn_app() -> TestApp {
     // The first time `initialize` is invoked the code in `TRACING` is executed.
-    // All other invocations will instead skip execution.
-    LazyLock::force(&TRACING);
+    init_tracing();
 
     let email_server = MockServer::start().await;
 
@@ -221,7 +238,12 @@ pub async fn spawn_app() -> TestApp {
         api_client: client,
     };
 
-    test_app.test_user.store(&test_app.db_pool).await;
+    test_app
+        .test_user
+        .store(&test_app.db_pool)
+        .await
+        .expect("Failed to store test user");
+
     test_app
 }
 
@@ -233,6 +255,7 @@ async fn configure_database(config: &DatabaseConfigs) -> PgPool {
         password: Secret::new("password".to_string()),
         ..config.clone()
     };
+
     let mut connection = PgConnection::connect_with(&maintenance_settings.connect_options())
         .await
         .expect("Failed to connect to Postgres");

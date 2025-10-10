@@ -1,15 +1,18 @@
-use crate::helpers::{TestUser, spawn_app};
+use crate::helpers::spawn_app;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
 
 #[tokio::test]
-async fn the_link_returned_by_add_user_returns_a_200_if_called() {
+async fn the_link_sent_by_send_subscribe_email_returns_a_200_if_called() {
     let app = spawn_app().await;
-    let user = TestUser::generate();
-    let payload = serde_json::json!({
-        "name": user.username,
-        "email": user.email
+
+    //  Login
+    let login_body = serde_json::json!({
+    "username": &app.test_user.username,
+    "password": &app.test_user.password
     });
+    let response = app.login(&login_body).await;
+    assert_eq!(response.status().as_u16(), 200);
 
     Mock::given(path("/email"))
         .and(method("POST"))
@@ -17,7 +20,7 @@ async fn the_link_returned_by_add_user_returns_a_200_if_called() {
         .mount(&app.email_server)
         .await;
 
-    app.register_user(&payload).await;
+    app.send_subscribe_email().await;
 
     let email_request = &app.email_server.received_requests().await.unwrap()[0];
     let confirmation_links = app.get_confirmation_links(email_request);
@@ -28,13 +31,16 @@ async fn the_link_returned_by_add_user_returns_a_200_if_called() {
 }
 
 #[tokio::test]
-async fn clicking_on_the_confirmation_link_activates_a_user_in_db() {
+async fn clicking_on_the_confirm_subscription_link_subscribes_a_user_in_db() {
     let app = spawn_app().await;
-    let user = TestUser::generate();
-    let payload = serde_json::json!({
-        "name": user.username,
-        "email": user.email
+
+    //  Login
+    let login_body = serde_json::json!({
+    "username": &app.test_user.username,
+    "password": &app.test_user.password
     });
+    let response = app.login(&login_body).await;
+    assert_eq!(response.status().as_u16(), 200);
 
     Mock::given(path("/email"))
         .and(method("POST"))
@@ -42,7 +48,10 @@ async fn clicking_on_the_confirmation_link_activates_a_user_in_db() {
         .mount(&app.email_server)
         .await;
 
-    app.register_user(&payload).await;
+    app.send_subscribe_email().await;
+
+    //  Logout as the user who clicks link in their email won't be logged in
+    app.logout().await;
 
     let email_request = &app.email_server.received_requests().await.unwrap()[0];
     let confirmation_links = app.get_confirmation_links(email_request);
@@ -57,26 +66,25 @@ async fn clicking_on_the_confirmation_link_activates_a_user_in_db() {
 
     let saved = sqlx::query!(
         r#"
-        SELECT email, name, is_activated, is_subscribed 
+        SELECT is_activated, is_subscribed
         FROM users
-        WHERE email = $1
+        WHERE name = $1
         "#,
-        user.email,
+        &app.test_user.username,
     )
     .fetch_one(&app.db_pool)
     .await
     .expect("Failed to fetch saved user data.");
 
-    assert_eq!(saved.email, user.email);
-    assert_eq!(saved.name, user.username);
     assert!(saved.is_activated);
+    assert!(saved.is_subscribed);
 }
 
 #[tokio::test]
-async fn confirmations_without_token_are_rejected_with_a_400() {
+async fn subscribe_user_requests_without_token_are_rejected_with_a_400() {
     let app = spawn_app().await;
 
-    let response = reqwest::get(&format!("{}/user/confirm", app.address))
+    let response = reqwest::get(&format!("{}/user/confirm/subscribe", app.address))
         .await
         .unwrap();
 
@@ -88,7 +96,7 @@ async fn subscribe_user_with_invalid_token_returns_401() {
     let app = spawn_app().await;
 
     let response = reqwest::get(&format!(
-        "{}/user/confirm?token=not-a-real-token",
+        "{}/user/confirm/subscribe?token=not-a-real-token",
         app.address
     ))
     .await
@@ -98,13 +106,14 @@ async fn subscribe_user_with_invalid_token_returns_401() {
 }
 
 #[tokio::test]
-async fn activation_token_is_deleted_after_successful_confirmation() {
+async fn subscription_token_is_deleted_after_successful_subscription() {
     let app = spawn_app().await;
-    let user = TestUser::generate();
-    let payload = serde_json::json!({
-        "name": user.username,
-        "email": user.email
-    });
+
+    app.login(&serde_json::json!({
+        "username": &app.test_user.username,
+        "password": &app.test_user.password
+    }))
+    .await;
 
     Mock::given(path("/email"))
         .and(method("POST"))
@@ -112,21 +121,15 @@ async fn activation_token_is_deleted_after_successful_confirmation() {
         .mount(&app.email_server)
         .await;
 
-    app.register_user(&payload).await;
+    app.send_subscribe_email().await;
 
     let email_request = &app.email_server.received_requests().await.unwrap()[0];
     let confirmation_links = app.get_confirmation_links(email_request);
 
-    let response = reqwest::get(confirmation_links.html)
-        .await
-        .unwrap()
-        .error_for_status()
-        .unwrap();
-
-    assert_eq!(response.status().as_u16(), 200);
+    reqwest::get(confirmation_links.html).await.unwrap();
 
     let remaining_tokens = sqlx::query!(
-        r#"SELECT COUNT(*) as count FROM tokens WHERE user_id = $1 AND is_activation = true"#,
+        r#"SELECT COUNT(*) as count FROM tokens WHERE user_id = $1 AND is_subscription = true"#,
         app.test_user.user_id,
     )
     .fetch_one(&app.db_pool)
@@ -137,13 +140,14 @@ async fn activation_token_is_deleted_after_successful_confirmation() {
 }
 
 #[tokio::test]
-async fn register_user_returns_500_if_email_sending_fails() {
+async fn send_subscribe_email_returns_500_if_email_sending_fails() {
     let app = spawn_app().await;
-    let user = TestUser::generate();
-    let payload = serde_json::json!({
-        "name": user.username,
-        "email": user.email
-    });
+
+    app.login(&serde_json::json!({
+        "username": &app.test_user.username,
+        "password": &app.test_user.password
+    }))
+    .await;
 
     Mock::given(path("/email"))
         .and(method("POST"))
@@ -151,7 +155,7 @@ async fn register_user_returns_500_if_email_sending_fails() {
         .mount(&app.email_server)
         .await;
 
-    let response = app.register_user(&payload).await;
+    let response = app.send_subscribe_email().await;
 
     assert_eq!(response.status().as_u16(), 500);
 }
