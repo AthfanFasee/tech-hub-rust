@@ -2,7 +2,7 @@ use crate::authentication::{reject_anonymous_users, reject_non_admin_users};
 use crate::configuration::{Configuration, DatabaseConfigs};
 use crate::email_client::EmailClient;
 use crate::routes::{
-    change_password, confirm_user, health_check, log_out, login, protected_endpoint,
+    change_password, confirm_user_activation, health_check, log_out, login, protected_endpoint,
     publish_newsletter, register_user, send_subscribe_email, subscribe_user,
 };
 use actix_session::SessionMiddleware;
@@ -102,7 +102,7 @@ async fn run(
             .route("/health_check", web::get().to(health_check))
             .route("/user/login", web::post().to(login))
             .route("/user/register", web::post().to(register_user))
-            .route("/user/confirm", web::get().to(confirm_user))
+            .route("/user/confirm", web::get().to(confirm_user_activation))
             .route("/user/confirm/subscribe", web::get().to(subscribe_user))
             // these routes go through the authentication middleware
             .service(
