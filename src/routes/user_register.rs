@@ -17,7 +17,7 @@ use sqlx::{Executor, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 #[derive(thiserror::Error)]
-pub enum UserError {
+pub enum UserRegisterError {
     // the 0 is something like `self.0` and will print the String value the ValidationError wraps around
     #[error("{0}")]
     ValidationError(String),
@@ -26,17 +26,17 @@ pub enum UserError {
     UnexpectedError(#[from] anyhow::Error),
 }
 
-impl std::fmt::Debug for UserError {
+impl std::fmt::Debug for UserRegisterError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         error_chain_fmt(self, f)
     }
 }
 
-impl ResponseError for UserError {
+impl ResponseError for UserRegisterError {
     fn error_response(&self) -> HttpResponse {
         let status_code = match self {
-            UserError::ValidationError(_) => StatusCode::BAD_REQUEST,
-            UserError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            UserRegisterError::ValidationError(_) => StatusCode::BAD_REQUEST,
+            UserRegisterError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
         build_error_response(status_code, self.to_string())
@@ -85,13 +85,16 @@ pub async fn register_user(
     pool: web::Data<PgPool>,
     email_client: web::Data<EmailClient>,
     base_url: web::Data<ApplicationBaseUrl>,
-) -> Result<HttpResponse, UserError> {
+) -> Result<HttpResponse, UserRegisterError> {
     // ValidationError doesn't have a from or source hence we have to map this error to the correct enum variant
     let NewUser {
         name,
         email,
         password,
-    } = payload.0.try_into().map_err(UserError::ValidationError)?;
+    } = payload
+        .0
+        .try_into()
+        .map_err(UserRegisterError::ValidationError)?;
 
     let mut transaction = pool
         .begin()
@@ -190,4 +193,95 @@ pub async fn send_confirmation_email(
     email_client
         .send_email(&user_email, "Welcome!", &html_body, &plain_body)
         .await
+}
+
+#[derive(serde::Deserialize)]
+pub struct ActivationParameters {
+    token: String,
+}
+
+#[derive(thiserror::Error)]
+pub enum UserActivationError {
+    #[error("There is no user associated with the provided token.")]
+    UnknownToken,
+
+    #[error(transparent)]
+    UnexpectedError(#[from] anyhow::Error),
+}
+
+impl std::fmt::Debug for UserActivationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        error_chain_fmt(self, f)
+    }
+}
+
+impl ResponseError for UserActivationError {
+    fn error_response(&self) -> HttpResponse {
+        let status_code = match self {
+            UserActivationError::UnknownToken => StatusCode::UNAUTHORIZED,
+            UserActivationError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+        build_error_response(status_code, self.to_string())
+    }
+}
+
+#[tracing::instrument(name = "Confirm a pending user activation", skip(parameters, pool))]
+
+pub async fn confirm_user_activation(
+    parameters: web::Query<ActivationParameters>,
+    pool: web::Data<PgPool>,
+) -> Result<HttpResponse, UserActivationError> {
+    let user_id = get_user_id_from_token(&pool, &parameters.token)
+        .await?
+        // Domain error (invalid token), so a new `UserConfirmError::UnknownToken` error is created as there's no existing error to wrap in an `anyhow::Error`
+        .ok_or(UserActivationError::UnknownToken)?;
+
+    activate_user_and_delete_token(&pool, user_id, &parameters.token).await?;
+
+    Ok(HttpResponse::Ok().finish())
+}
+
+#[tracing::instrument(
+    name = "Mark user as activated and delete token",
+    skip(user_id, pool, token)
+)]
+pub async fn activate_user_and_delete_token(
+    pool: &PgPool,
+    user_id: Uuid,
+    token: &str,
+) -> Result<(), anyhow::Error> {
+    sqlx::query!(
+        r#"
+        WITH activate_user AS (
+            UPDATE users
+            SET is_activated = true
+            WHERE id = $1
+        )
+        DELETE FROM tokens
+        WHERE token = $2 AND user_id = $1 AND is_activation = true
+        "#,
+        user_id,
+        token,
+    )
+    .execute(pool)
+    .await
+    .context("Failed to update the user status as activated")?;
+
+    Ok(())
+}
+
+#[tracing::instrument(name = "Get user_id from token", skip(token, pool))]
+pub async fn get_user_id_from_token(
+    pool: &PgPool,
+    token: &str,
+) -> Result<Option<Uuid>, anyhow::Error> {
+    let result = sqlx::query!(
+        "SELECT user_id FROM tokens \
+            WHERE token = $1",
+        token,
+    )
+    .fetch_optional(pool)
+    .await
+    .context("Failed to retrieve the user id associated with the provided token.")?;
+    Ok(result.map(|r| r.user_id))
 }
