@@ -3,6 +3,6 @@ mod helpers;
 mod login;
 mod news_letter;
 mod password_reset;
-mod user;
 mod user_confirm;
+mod user_register;
 mod user_subscribe;
