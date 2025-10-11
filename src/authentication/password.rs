@@ -117,7 +117,7 @@ pub async fn change_password(
     .context("Failed to change user's password in the database.")?;
     Ok(())
 }
-fn compute_password_hash(password: Secret<String>) -> Result<Secret<String>, anyhow::Error> {
+pub fn compute_password_hash(password: Secret<String>) -> Result<Secret<String>, anyhow::Error> {
     let salt = SaltString::generate(&mut rand::thread_rng());
     let password_hash = Argon2::new(
         Algorithm::Argon2id,

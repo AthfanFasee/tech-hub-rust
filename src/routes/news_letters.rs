@@ -1,8 +1,8 @@
 use crate::authentication::UserId;
 use crate::domain::UserEmail;
 use crate::email_client::EmailClient;
-use crate::idempotency::save_response;
-use crate::idempotency::{IdempotencyKey, get_saved_response};
+use crate::idempotency::{IdempotencyKey, NextAction, get_saved_response};
+use crate::idempotency::{save_response, try_processing};
 use crate::{build_error_response, error_chain_fmt};
 use actix_web::http::StatusCode;
 use actix_web::{HttpRequest, HttpResponse, ResponseError, web};
@@ -77,8 +77,11 @@ pub async fn publish_newsletter(
 
     tracing::Span::current().record("user_id", tracing::field::display(*user_id));
 
-    if let Some(saved_response) = get_saved_response(&pool, &idempotency_key, *user_id).await? {
-        return Ok(saved_response);
+    match try_processing(&pool, &idempotency_key, *user_id).await? {
+        NextAction::StartProcessing => {}
+        NextAction::ReturnSavedResponse(saved_response) => {
+            return Ok(saved_response);
+        }
     }
 
     let users = get_subscribed_users(&pool).await?;

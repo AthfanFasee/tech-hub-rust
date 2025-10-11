@@ -1,4 +1,5 @@
 use crate::helpers::{ConfirmationLinks, TestApp, TestUser, spawn_app};
+use std::time::Duration;
 use wiremock::matchers::{any, method, path};
 use wiremock::{Mock, ResponseTemplate};
 
@@ -165,11 +166,48 @@ async fn newsletter_publishing_is_idempotent() {
     });
 
     let key = uuid::Uuid::new_v4().to_string();
-    let response = app.publish_newsletters(&newsletter_body, Some(&key)).await;
-    assert_eq!(response.status().as_u16(), 200);
     // Stimulate publishing newsletters twice back to back
     let response = app.publish_newsletters(&newsletter_body, Some(&key)).await;
     assert_eq!(response.status().as_u16(), 200);
+    let response = app.publish_newsletters(&newsletter_body, Some(&key)).await;
+    assert_eq!(response.status().as_u16(), 200);
+}
+
+#[tokio::test]
+async fn concurrent_newsletter_publishing_is_handled_gracefully() {
+    let app = spawn_app().await;
+    create_active_subscriber(&app).await;
+    app.login_admin().await;
+
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        // Setting a delay ensures that the second request arrives before the first one completes
+        .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_secs(1)))
+        .expect(1)
+        .mount(&app.email_server)
+        .await;
+
+    // Publish newsletter
+    let newsletter_body = serde_json::json!({
+        "title": "Test Newsletter",
+        "content": {
+            "text": "Hello subscribers!",
+            "html": "<p>Hello subscribers!</p>"
+        }
+    });
+
+    let key = uuid::Uuid::new_v4().to_string();
+    let response1 = app.publish_newsletters(&newsletter_body, Some(&key));
+    let response2 = app.publish_newsletters(&newsletter_body, Some(&key));
+
+    // Stimulate publishing newsletters concurrently
+    let (response1, response2) = tokio::join!(response1, response2);
+
+    assert_eq!(response1.status(), response2.status());
+    assert_eq!(
+        response1.text().await.unwrap(),
+        response2.text().await.unwrap()
+    );
 }
 
 async fn create_inactivated_user(app: &TestApp) -> ConfirmationLinks {

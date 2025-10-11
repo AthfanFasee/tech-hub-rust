@@ -1,13 +1,16 @@
-use crate::domain::{NewUser, UserEmail, UserName};
+use crate::authentication::compute_password_hash;
+use crate::domain::{NewUser, UserEmail, UserName, UserPassword};
 use crate::email_client::EmailClient;
 use crate::email_client::EmailError;
 use crate::startup::ApplicationBaseUrl;
+use crate::telemetry::spawn_blocking_with_tracing;
 use crate::utils::generate_token;
 use crate::{build_error_response, error_chain_fmt};
 use actix_web::ResponseError;
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, web};
 use anyhow::Context;
+use secrecy::ExposeSecret;
 use serde::Deserialize;
 use serde::Serialize;
 use sqlx::{Executor, PgPool, Postgres, Transaction};
@@ -50,6 +53,7 @@ struct SuccessResponse {
 pub struct UserData {
     email: String,
     name: String,
+    password: String,
 }
 
 // This is like saying - I know how to build myself `NewUser` from something else `UserData`
@@ -60,12 +64,17 @@ impl TryFrom<UserData> for NewUser {
     fn try_from(payload: UserData) -> Result<Self, Self::Error> {
         let name = UserName::parse(payload.name)?;
         let email = UserEmail::parse(payload.email)?;
-        Ok(Self { name, email })
+        let password = UserPassword::parse(payload.password)?;
+        Ok(Self {
+            name,
+            email,
+            password,
+        })
     }
 }
 #[tracing::instrument(
     name = "Add a new user",
-    skip(pool, payload, email_client, base_url),
+    skip_all,
     fields(
         user_email = %payload.email,
         user_name = %payload.name,
@@ -77,15 +86,19 @@ pub async fn register_user(
     email_client: web::Data<EmailClient>,
     base_url: web::Data<ApplicationBaseUrl>,
 ) -> Result<HttpResponse, UserError> {
-    // ValidationError doesn't have a from or source hence we are forced to map this error to the correct enum variant
-    let new_user = payload.0.try_into().map_err(UserError::ValidationError)?;
+    // ValidationError doesn't have a from or source hence we have to map this error to the correct enum variant
+    let NewUser {
+        name,
+        email,
+        password,
+    } = payload.0.try_into().map_err(UserError::ValidationError)?;
 
     let mut transaction = pool
         .begin()
         .await
         .context("Failed to acquire a Postgres connection from the pool")?;
 
-    let user_id = insert_user(&new_user, &mut transaction).await?;
+    let user_id = insert_user(&name, &email, password, &mut transaction).await?;
 
     let activation_token = generate_token();
 
@@ -96,7 +109,7 @@ pub async fn register_user(
         .await
         .context("Failed to commit SQL transaction to store a new user")?;
 
-    send_confirmation_email(&email_client, new_user, &base_url.0, &activation_token)
+    send_confirmation_email(&email_client, email, &base_url.0, &activation_token)
         .await
         .context("Failed to send a user activation email")?;
 
@@ -108,14 +121,18 @@ pub async fn register_user(
     Ok(HttpResponse::Ok().json(success))
 }
 
-#[tracing::instrument(
-    name = "Save new user details in the database",
-    skip(new_user, transaction)
-)]
+#[tracing::instrument(name = "Save new user details in the database", skip_all)]
 pub async fn insert_user(
-    new_user: &NewUser,
+    name: &UserName,
+    email: &UserEmail,
+    password: UserPassword,
     transaction: &mut Transaction<'_, Postgres>,
 ) -> Result<Uuid, anyhow::Error> {
+    let password_hash =
+        spawn_blocking_with_tracing(move || compute_password_hash(password.into_secret()))
+            .await?
+            .context("Failed to hash password")?;
+
     let user_id = Uuid::new_v4();
     let query = sqlx::query!(
         r#"
@@ -123,9 +140,9 @@ pub async fn insert_user(
             VALUES ($1, $2, $3, $4)
            "#,
         user_id,
-        new_user.name.as_ref(),
-        new_user.email.as_ref(),
-        "dummy_hash"
+        name.as_ref(),
+        email.as_ref(),
+        password_hash.expose_secret()
     );
 
     transaction
@@ -159,7 +176,7 @@ pub async fn store_activation_token(
 #[tracing::instrument(name = "Send a confirmation email to new user", skip_all)]
 pub async fn send_confirmation_email(
     email_client: &EmailClient,
-    new_user: NewUser,
+    user_email: UserEmail,
     base_url: &str,
     token: &str,
 ) -> Result<(), EmailError> {
@@ -171,6 +188,6 @@ pub async fn send_confirmation_email(
         Click <a href=\"{confirmation_link}\">here</a> to confirm your subscription.",
     );
     email_client
-        .send_email(&new_user.email, "Welcome!", &html_body, &plain_body)
+        .send_email(&user_email, "Welcome!", &html_body, &plain_body)
         .await
 }
