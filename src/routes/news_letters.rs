@@ -1,9 +1,11 @@
 use crate::authentication::UserId;
 use crate::domain::UserEmail;
 use crate::email_client::EmailClient;
+use crate::idempotency::save_response;
+use crate::idempotency::{IdempotencyKey, get_saved_response};
 use crate::{build_error_response, error_chain_fmt};
 use actix_web::http::StatusCode;
-use actix_web::{HttpResponse, ResponseError, web};
+use actix_web::{HttpRequest, HttpResponse, ResponseError, web};
 use anyhow::Context;
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -12,6 +14,8 @@ use sqlx::PgPool;
 pub enum PublishError {
     #[error("Authentication failed")]
     AuthError(#[source] anyhow::Error),
+    #[error("Invalid request: {0}")]
+    BadRequest(#[source] anyhow::Error),
     #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),
 }
@@ -27,6 +31,7 @@ impl ResponseError for PublishError {
         let status_code = match self {
             PublishError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             PublishError::AuthError(_) => StatusCode::UNAUTHORIZED,
+            PublishError::BadRequest(_) => StatusCode::BAD_REQUEST,
         };
 
         build_error_response(status_code, self.to_string())
@@ -51,12 +56,31 @@ pub struct Content {
 )]
 
 pub async fn publish_newsletter(
+    req: HttpRequest,
     body: web::Json<BodyData>,
     pool: web::Data<PgPool>,
     email_client: web::Data<EmailClient>,
     user_id: web::ReqData<UserId>,
 ) -> Result<HttpResponse, PublishError> {
+    let user_id = user_id.into_inner();
+
+    let idempotency_key = req
+        .headers()
+        .get("Idempotency-Key")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+
+    let idempotency_key: IdempotencyKey = idempotency_key
+        .try_into()
+        .map_err(PublishError::BadRequest)?;
+
     tracing::Span::current().record("user_id", tracing::field::display(*user_id));
+
+    if let Some(saved_response) = get_saved_response(&pool, &idempotency_key, *user_id).await? {
+        return Ok(saved_response);
+    }
+
     let users = get_subscribed_users(&pool).await?;
     for user in users {
         match user {
@@ -84,7 +108,10 @@ pub async fn publish_newsletter(
             }
         }
     }
-    Ok(HttpResponse::Ok().finish())
+
+    let response = HttpResponse::Ok().finish();
+    let response = save_response(&pool, &idempotency_key, *user_id, response).await?;
+    Ok(response)
 }
 
 struct ConfirmedUser {

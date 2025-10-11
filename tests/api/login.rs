@@ -10,7 +10,7 @@ async fn login_returns_success_for_valid_username_and_password() {
     "password": &app.test_user.password
     });
 
-    let response = app.login_custom_credentials(&payload).await;
+    let response = app.login_with(&payload).await;
 
     assert_eq!(
         200,
@@ -28,7 +28,7 @@ async fn login_returns_unauthorized_for_invalid_username_or_password() {
     "password": Uuid::new_v4().to_string()
     });
 
-    let response = app.login_custom_credentials(&payload).await;
+    let response = app.login_with(&payload).await;
 
     assert_eq!(
         401,
@@ -47,7 +47,7 @@ async fn login_does_not_leak_internal_error_details_on_auth_failure() {
         "password": Uuid::new_v4().to_string(),
     });
 
-    let response = app.login_custom_credentials(&payload).await;
+    let response = app.login_with(&payload).await;
     assert_eq!(
         401,
         response.status().as_u16(),
@@ -71,14 +71,14 @@ async fn logout_clears_session_state() {
     let app = spawn_app().await;
     app.login().await;
 
-    let response = app.access_protected_endpoint().await;
+    let response = app.access_protected().await;
     assert_eq!(response.status().as_u16(), 200);
 
     let response = app.logout().await;
     assert_eq!(response.status().as_u16(), 200);
 
     // Try again to access protected endpoint
-    let response = app.access_protected_endpoint().await;
+    let response = app.access_protected().await;
     assert_eq!(
         response.status().as_u16(),
         401,

@@ -85,15 +85,11 @@ pub async fn register_user(
         .await
         .context("Failed to acquire a Postgres connection from the pool")?;
 
-    let user_id = insert_user(&new_user, &mut transaction)
-        .await
-        .context("Failed to insert new user")?;
+    let user_id = insert_user(&new_user, &mut transaction).await?;
 
     let activation_token = generate_token();
 
-    store_activation_token(&mut transaction, user_id, &activation_token)
-        .await
-        .context("Failed to store the user activation token")?;
+    store_activation_token(&mut transaction, user_id, &activation_token).await?;
 
     transaction
         .commit()
@@ -119,7 +115,7 @@ pub async fn register_user(
 pub async fn insert_user(
     new_user: &NewUser,
     transaction: &mut Transaction<'_, Postgres>,
-) -> Result<Uuid, sqlx::Error> {
+) -> Result<Uuid, anyhow::Error> {
     let user_id = Uuid::new_v4();
     let query = sqlx::query!(
         r#"
@@ -132,15 +128,19 @@ pub async fn insert_user(
         "dummy_hash"
     );
 
-    transaction.execute(query).await?;
+    transaction
+        .execute(query)
+        .await
+        .context("Failed to insert new user")?;
     Ok(user_id)
 }
+
 #[tracing::instrument(name = "Store token in the database", skip(token, transaction))]
 pub async fn store_activation_token(
     transaction: &mut Transaction<'_, Postgres>,
     user_id: Uuid,
     token: &str,
-) -> Result<(), sqlx::Error> {
+) -> Result<(), anyhow::Error> {
     let query = sqlx::query!(
         r#"INSERT INTO tokens (token, user_id, is_activation)
             VALUES ($1, $2, $3)"#,
@@ -149,7 +149,10 @@ pub async fn store_activation_token(
         true,
     );
 
-    transaction.execute(query).await?;
+    transaction
+        .execute(query)
+        .await
+        .context("Failed to store the user activation token")?;
     Ok(())
 }
 

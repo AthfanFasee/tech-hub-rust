@@ -51,14 +51,11 @@ pub async fn subscribe_user(
     pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, UserSubscribeError> {
     let user_id = get_user_id_from_token(&pool, &parameters.token)
-        .await
-        .context("Failed to retrieve the user id associated with the provided token.")?
+        .await?
         // Domain error (invalid token), so a new `UserConfirmError::UnknownToken` error is created instead of wrapping an `anyhow::Error`
         .ok_or(UserSubscribeError::UnknownToken)?;
 
-    subscribe_user_and_delete_token(&pool, user_id, &parameters.token)
-        .await
-        .context("Failed to update the user status as subscribed")?;
+    subscribe_user_and_delete_token(&pool, user_id, &parameters.token).await?;
 
     Ok(HttpResponse::Ok().finish())
 }
@@ -71,7 +68,7 @@ pub async fn subscribe_user_and_delete_token(
     pool: &PgPool,
     user_id: Uuid,
     token: &str,
-) -> Result<(), sqlx::Error> {
+) -> Result<(), anyhow::Error> {
     sqlx::query!(
         r#"
         WITH subscribe_user AS (
@@ -86,7 +83,8 @@ pub async fn subscribe_user_and_delete_token(
         token,
     )
     .execute(pool)
-    .await?;
+    .await
+    .context("Failed to update the user status as subscribed")?;
 
     Ok(())
 }
@@ -107,13 +105,11 @@ pub async fn send_subscribe_email(
 
     let activation_token = generate_token();
 
-    store_subscription_token(&pool, *user_id, &activation_token)
-        .await
-        .context("Failed to store the user subscription token")?;
+    store_subscription_token(&pool, *user_id, &activation_token).await?;
 
     send_subscription_email(&email_client, email, &base_url.0, &activation_token)
         .await
-        .context("Failed to send a user activation email")?;
+        .context("Failed to send a user subscription email")?;
 
     Ok(HttpResponse::Ok().finish())
 }
@@ -159,7 +155,7 @@ pub async fn store_subscription_token(
     pool: &PgPool,
     user_id: Uuid,
     token: &str,
-) -> Result<(), sqlx::Error> {
+) -> Result<(), anyhow::Error> {
     sqlx::query!(
         r#"INSERT INTO tokens (token, user_id, is_subscription)
             VALUES ($1, $2, $3)"#,
@@ -168,7 +164,8 @@ pub async fn store_subscription_token(
         true,
     )
     .execute(pool)
-    .await?;
+    .await
+    .context("Failed to store the user subscription token")?;
 
     Ok(())
 }

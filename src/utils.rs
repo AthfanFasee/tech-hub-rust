@@ -1,5 +1,5 @@
-use actix_web::HttpResponse;
 use actix_web::http::StatusCode;
+use actix_web::{HttpResponse, error};
 use rand::distributions::Alphanumeric;
 use rand::{Rng, thread_rng};
 use serde::Serialize;
@@ -22,7 +22,6 @@ pub fn error_chain_fmt(
     e: &(dyn std::error::Error),
     f: &mut std::fmt::Formatter<'_>,
 ) -> std::fmt::Result {
-    // Top-level: use Display to avoid recursion
     writeln!(f, "{e}")?;
 
     let mut current = e.source();
@@ -38,19 +37,24 @@ pub fn error_chain_fmt(
     Ok(())
 }
 
-// Return an opaque 500 while preserving the error's root cause for logging.
-pub fn e500<T>(e: T) -> actix_web::Error
-where
-    T: std::fmt::Debug + std::fmt::Display + 'static,
-{
-    actix_web::error::ErrorInternalServerError(e)
-}
-
-// Generate a random 25-characters-long case-sensitive token.
 pub fn generate_token() -> String {
     let mut rng = thread_rng();
     std::iter::repeat_with(|| rng.sample(Alphanumeric))
         .map(char::from)
         .take(25)
         .collect()
+}
+
+// Generic error helper that wraps any error into an appropriate Actix error while preserving root causes
+pub fn app_error<T>(status: StatusCode, e: T) -> actix_web::Error
+where
+    T: std::fmt::Debug + std::fmt::Display + 'static,
+{
+    match status {
+        StatusCode::BAD_REQUEST => error::ErrorBadRequest(e),
+        StatusCode::UNAUTHORIZED => error::ErrorUnauthorized(e),
+        StatusCode::FORBIDDEN => error::ErrorForbidden(e),
+        StatusCode::INTERNAL_SERVER_ERROR => error::ErrorInternalServerError(e),
+        _ => error::ErrorInternalServerError(e),
+    }
 }

@@ -1,5 +1,7 @@
 use argon2::password_hash::SaltString;
 use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version};
+use reqwest::Response;
+use reqwest::header::HeaderMap;
 use secrecy::Secret;
 use serde_json::Value;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
@@ -98,97 +100,94 @@ impl TestApp {
         ConfirmationLinks { html, plain_text }
     }
 
-    pub async fn register_user(&self, payload: &Value) -> reqwest::Response {
+    async fn send_get(&self, endpoint: &str) -> Response {
         self.api_client
-            .post(&format!("{}/user/register", &self.address))
-            .header(reqwest::header::CONTENT_TYPE, "application/json")
-            .json(payload)
+            .get(format!("{}/{}", &self.address, endpoint))
             .send()
             .await
-            .expect("Failed to execute request: add_user")
+            .expect("Failed to execute GET request.")
     }
 
-    pub async fn publish_newsletters(&self, payload: &Value) -> reqwest::Response {
+    async fn send_post(&self, endpoint: &str, payload: &Value) -> Response {
         self.api_client
-            .post(&format!("{}/admin/newsletters/publish", &self.address))
+            .post(format!("{}/{}", &self.address, endpoint))
             .json(payload)
             .send()
             .await
-            .expect("Failed to execute request.")
+            .expect("Failed to execute POST request.")
+    }
+
+    pub async fn send_post_with_headers(
+        &self,
+        endpoint: &str,
+        payload: &Value,
+        headers: &HeaderMap,
+    ) -> Response {
+        self.api_client
+            .post(format!("{}/{}", &self.address, endpoint))
+            .json(payload)
+            .headers(headers.clone())
+            .send()
+            .await
+            .expect("Failed to execute POST request.")
+    }
+
+    pub async fn register_user(&self, payload: &Value) -> Response {
+        self.send_post("user/register", payload).await
     }
 
     pub async fn login(&self) {
-        let login_body = serde_json::json!({
-        "username": &self.test_user.username,
-        "password": &self.test_user.password
+        let body = serde_json::json!({
+            "username": &self.test_user.username,
+            "password": &self.test_user.password,
         });
-
-        let response = self
-            .api_client
-            .post(&format!("{}/user/login", &self.address))
-            .json(&login_body)
-            .send()
-            .await
-            .expect("Failed to execute request.");
+        let response = self.send_post("user/login", &body).await;
         assert_eq!(response.status().as_u16(), 200);
     }
 
-    pub async fn login_custom_credentials(&self, payload: &Value) -> reqwest::Response {
-        self.api_client
-            .post(&format!("{}/user/login", &self.address))
-            .json(payload)
-            .send()
-            .await
-            .expect("Failed to execute request.")
+    pub async fn login_with(&self, creds: &Value) -> Response {
+        self.send_post("user/login", creds).await
     }
 
     pub async fn login_admin(&self) {
-        let login_body = serde_json::json!({
+        let body = serde_json::json!({
             "username": "athfan",
-            "password": "athfan123"
+            "password": "athfan123",
         });
 
-        let response = self
-            .api_client
-            .post(&format!("{}/user/login", &self.address))
-            .json(&login_body)
-            .send()
-            .await
-            .expect("Failed to execute request.");
+        let response = self.send_post("user/login", &body).await;
         assert_eq!(response.status().as_u16(), 200);
     }
 
-    pub async fn change_password(&self, payload: &Value) -> reqwest::Response {
-        self.api_client
-            .post(&format!("{}/user/reset-password", &self.address))
-            .json(&payload)
-            .send()
-            .await
-            .expect("Failed to execute request.")
+    pub async fn change_password(&self, payload: &Value) -> Response {
+        self.send_post("user/reset-password", payload).await
     }
 
-    pub async fn logout(&self) -> reqwest::Response {
-        self.api_client
-            .post(&format!("{}/user/logout", &self.address))
-            .send()
-            .await
-            .expect("Failed to execute request.")
+    pub async fn logout(&self) -> Response {
+        self.send_post("user/logout", &serde_json::json!({})).await
     }
 
-    pub async fn access_protected_endpoint(&self) -> reqwest::Response {
-        self.api_client
-            .get(&format!("{}/user/protected", &self.address))
-            .send()
-            .await
-            .expect("Failed to execute request.")
+    pub async fn access_protected(&self) -> Response {
+        self.send_get("user/protected").await
     }
 
-    pub async fn send_subscribe_email(&self) -> reqwest::Response {
-        self.api_client
-            .get(&format!("{}/user/email/subscribe", &self.address))
-            .send()
-            .await
-            .expect("Failed to execute request.")
+    pub async fn publish_newsletters(
+        &self,
+        payload: &Value,
+        idempotency_key: Option<&String>,
+    ) -> Response {
+        if let Some(key) = idempotency_key {
+            let mut headers = HeaderMap::new();
+            headers.insert("Idempotency-Key", key.parse().unwrap());
+            self.send_post_with_headers("admin/newsletters/publish", payload, &headers)
+                .await
+        } else {
+            self.send_post("admin/newsletters/publish", payload).await
+        }
+    }
+
+    pub async fn send_subscribe_email(&self) -> Response {
+        self.send_get("user/email/subscribe").await
     }
 }
 
