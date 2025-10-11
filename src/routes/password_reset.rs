@@ -14,7 +14,7 @@ use uuid::Uuid;
 pub enum PasswordResetError {
     #[error("Authentication failed")]
     AuthError(#[source] anyhow::Error),
-    #[error("Bad request: {0}")]
+    #[error("Invalid request: {0}")]
     BadRequest(String),
     #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),

@@ -94,10 +94,10 @@ async fn changing_password_works() {
     "password": &new_password
     });
 
-    let response = app.login_custom_credentials(&login_body).await;
+    let response = app.login_with(&login_body).await;
     assert_eq!(response.status().as_u16(), 200);
 
     // Access protected endpoint
-    let response = app.access_protected_endpoint().await;
+    let response = app.access_protected().await;
     assert_eq!(response.status().as_u16(), 200);
 }

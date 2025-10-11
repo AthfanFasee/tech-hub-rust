@@ -1,8 +1,7 @@
+use crate::app_error;
 use crate::session_state::TypedSession;
-use crate::utils::{build_error_response, e500};
 use actix_web::body::MessageBody;
 use actix_web::dev::{ServiceRequest, ServiceResponse};
-use actix_web::error::InternalError;
 use actix_web::http::StatusCode;
 use actix_web::middleware::Next;
 use actix_web::{FromRequest, HttpMessage};
@@ -26,6 +25,7 @@ impl Deref for UserId {
     }
 }
 
+// Middleware that rejects requests from unauthenticated users
 pub async fn reject_anonymous_users(
     mut req: ServiceRequest,
     next: Next<impl MessageBody>,
@@ -35,19 +35,16 @@ pub async fn reject_anonymous_users(
         TypedSession::from_request(http_request, payload).await
     }?;
 
-    match session.get_user_id().map_err(e500)? {
-        Some(user_id) => {
-            req.extensions_mut().insert(UserId(user_id));
-            next.call(req).await
-        }
-        None => {
-            let msg = "User has not logged in";
-            let response = build_error_response(StatusCode::UNAUTHORIZED, msg.to_string());
-            Err(InternalError::from_response(anyhow::anyhow!(msg), response).into())
-        }
-    }
+    let user_id = session
+        .get_user_id()
+        .map_err(|e| app_error(StatusCode::INTERNAL_SERVER_ERROR, e))?
+        .ok_or_else(|| app_error(StatusCode::UNAUTHORIZED, "User has not logged in"))?;
+
+    req.extensions_mut().insert(UserId(user_id));
+    next.call(req).await
 }
 
+// Middleware that rejects requests from non-admin users
 pub async fn reject_non_admin_users(
     mut req: ServiceRequest,
     next: Next<impl MessageBody>,
@@ -57,23 +54,21 @@ pub async fn reject_non_admin_users(
         TypedSession::from_request(http_request, payload).await
     }?;
 
-    let user_id = session.get_user_id().map_err(e500)?.ok_or_else(|| {
-        let msg = "User has not logged in";
-        let response = build_error_response(StatusCode::UNAUTHORIZED, msg.to_string());
-        InternalError::from_response(anyhow::anyhow!(msg), response)
-    })?;
+    let user_id = session
+        .get_user_id()
+        .map_err(|e| app_error(StatusCode::INTERNAL_SERVER_ERROR, e))?
+        .ok_or_else(|| app_error(StatusCode::UNAUTHORIZED, "User has not logged in"))?;
 
-    // we will only ever hit this if the session is somehow corrupted
-    let is_admin = session.get_is_admin().map_err(e500)?.ok_or_else(|| {
-        let msg = "Missing admin flag in session";
-        let response = build_error_response(StatusCode::UNAUTHORIZED, msg.to_string());
-        InternalError::from_response(anyhow::anyhow!(msg), response)
-    })?;
+    let is_admin = session
+        .get_is_admin()
+        .map_err(|e| app_error(StatusCode::INTERNAL_SERVER_ERROR, e))?
+        .ok_or_else(|| app_error(StatusCode::UNAUTHORIZED, "Missing admin flag in session"))?;
 
     if !is_admin {
-        let msg = "Admin privileges required";
-        let response = build_error_response(StatusCode::FORBIDDEN, msg.to_string());
-        return Err(InternalError::from_response(anyhow::anyhow!(msg), response).into());
+        return Err(app_error(
+            StatusCode::FORBIDDEN,
+            "Admin privileges required",
+        ));
     }
 
     req.extensions_mut().insert(UserId(user_id));

@@ -42,14 +42,11 @@ pub async fn confirm_user(
     pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, UserConfirmError> {
     let user_id = get_user_id_from_token(&pool, &parameters.token)
-        .await
-        .context("Failed to retrieve the user id associated with the provided token.")?
-        // Domain error (invalid token), so a new `UserConfirmError::UnknownToken` error is created instead of wrapping an `anyhow::Error`
+        .await?
+        // Domain error (invalid token), so a new `UserConfirmError::UnknownToken` error is created as there's no existing error to wrap in an `anyhow::Error`
         .ok_or(UserConfirmError::UnknownToken)?;
 
-    activate_user_and_delete_token(&pool, user_id, &parameters.token)
-        .await
-        .context("Failed to update the user status as activated")?;
+    activate_user_and_delete_token(&pool, user_id, &parameters.token).await?;
 
     Ok(HttpResponse::Ok().finish())
 }
@@ -62,7 +59,7 @@ pub async fn activate_user_and_delete_token(
     pool: &PgPool,
     user_id: Uuid,
     token: &str,
-) -> Result<(), sqlx::Error> {
+) -> Result<(), anyhow::Error> {
     sqlx::query!(
         r#"
         WITH activate_user AS (
@@ -77,7 +74,8 @@ pub async fn activate_user_and_delete_token(
         token,
     )
     .execute(pool)
-    .await?;
+    .await
+    .context("Failed to update the user status as activated")?;
 
     Ok(())
 }
@@ -86,13 +84,14 @@ pub async fn activate_user_and_delete_token(
 pub async fn get_user_id_from_token(
     pool: &PgPool,
     token: &str,
-) -> Result<Option<Uuid>, sqlx::Error> {
+) -> Result<Option<Uuid>, anyhow::Error> {
     let result = sqlx::query!(
         "SELECT user_id FROM tokens \
             WHERE token = $1",
         token,
     )
     .fetch_optional(pool)
-    .await?;
+    .await
+    .context("Failed to retrieve the user id associated with the provided token.")?;
     Ok(result.map(|r| r.user_id))
 }

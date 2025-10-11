@@ -3,6 +3,7 @@ token TEXT NOT NULL,
 user_id UUID NOT NULL REFERENCES users(id),
 is_subscription BOOLEAN NOT NULL DEFAULT FALSE,
 is_activation BOOLEAN NOT NULL DEFAULT FALSE,
+"created_at" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 PRIMARY KEY (token)
 );
 
