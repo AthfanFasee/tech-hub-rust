@@ -8,7 +8,7 @@ async fn register_user_persists_the_new_user_and_returns_a_200_for_valid_json_da
 
     let user = TestUser::generate();
     let payload = serde_json::json!({
-        "name": user.username,
+        "user_name": user.user_name,
         "email": user.email,
         "password": user.password,
     });
@@ -24,7 +24,7 @@ async fn register_user_persists_the_new_user_and_returns_a_200_for_valid_json_da
 
     let saved = sqlx::query!(
         r#"
-        SELECT email, name, is_activated, is_subscribed 
+        SELECT email, user_name, is_activated, is_subscribed
         FROM users
         WHERE email = $1
         "#,
@@ -35,7 +35,7 @@ async fn register_user_persists_the_new_user_and_returns_a_200_for_valid_json_da
     .expect("Failed to fetch saved user data.");
 
     assert_eq!(saved.email, user.email);
-    assert_eq!(saved.name, user.username);
+    assert_eq!(saved.user_name, user.user_name);
     assert!(!saved.is_activated);
     assert!(!saved.is_subscribed);
 }
@@ -45,7 +45,7 @@ async fn register_user_can_login_using_their_credentials() {
     let app = spawn_app().await;
     let user = TestUser::generate();
     let payload = serde_json::json!({
-        "name": user.username,
+        "user_name": user.user_name,
         "email": user.email,
         "password": user.password,
     });
@@ -70,7 +70,7 @@ async fn register_user_can_login_using_their_credentials() {
 
     // login using the same credentials used when registering
     let payload = serde_json::json!({
-    "username": user.username,
+    "user_name": user.user_name,
     "password": user.password
     });
 
@@ -89,7 +89,7 @@ async fn register_user_returns_a_400_when_data_is_missing() {
     let user = TestUser::generate();
     let test_cases = vec![
         (
-            serde_json::json!({ "name": user.username, "password": user.password }),
+            serde_json::json!({ "name": user.user_name, "password": user.password }),
             "missing the email",
         ),
         (
@@ -97,7 +97,7 @@ async fn register_user_returns_a_400_when_data_is_missing() {
             "missing the name",
         ),
         (
-            serde_json::json!({ "name": user.username, "email": user.email }),
+            serde_json::json!({ "name": user.user_name, "email": user.email }),
             "missing the password",
         ),
         (serde_json::json!({}), "missing name, email and password"),
@@ -120,7 +120,7 @@ async fn register_user_returns_a_400_when_data_is_present_but_invalid() {
     let user = TestUser::generate();
     let test_cases = vec![
         (
-            serde_json::json!({ "name": user.username, "email": "", "password": user.password }),
+            serde_json::json!({ "name": user.user_name, "email": "", "password": user.password }),
             "empty email string",
         ),
         (
@@ -128,7 +128,7 @@ async fn register_user_returns_a_400_when_data_is_present_but_invalid() {
             "empty name string",
         ),
         (
-            serde_json::json!({"name": user.username, "email": "definitely wrong email", "password": user.password}),
+            serde_json::json!({"name": user.user_name, "email": "definitely wrong email", "password": user.password}),
             "invalid email address",
         ),
         (
@@ -136,7 +136,7 @@ async fn register_user_returns_a_400_when_data_is_present_but_invalid() {
             "name contains invalid characters",
         ),
         (
-            serde_json::json!({"name": user.username, "email": user.email, "password": "123"}),
+            serde_json::json!({"name": user.user_name, "email": user.email, "password": "123"}),
             "password too small",
         ),
     ];
@@ -156,7 +156,7 @@ async fn register_user_sends_a_confirmation_email_with_a_link() {
     let app = spawn_app().await;
     let user = TestUser::generate();
     let payload = serde_json::json!({
-        "name": user.username,
+        "user_name": user.user_name,
         "email": user.email,
         "password": user.password,
     });
@@ -183,7 +183,7 @@ async fn register_user_returns_500_if_email_sending_fails() {
     let app = spawn_app().await;
     let user = TestUser::generate();
     let payload = serde_json::json!({
-        "name": user.username,
+        "user_name": user.user_name,
         "email": user.email,
         "password": user.password
     });
@@ -203,7 +203,7 @@ async fn register_user_fails_if_there_is_a_fatal_database_error() {
     let app = spawn_app().await;
     let user = TestUser::generate();
     let payload = serde_json::json!({
-        "name": user.username,
+        "user_name": user.user_name,
         "email": user.email,
          "password": user.password,
     });
@@ -224,7 +224,7 @@ async fn clicking_on_the_confirmation_link_activates_a_user_in_db() {
 
     let user = TestUser::generate();
     let payload = serde_json::json!({
-        "name": user.username,
+        "user_name": user.user_name,
         "email": user.email,
         "password": user.password
     });
@@ -249,7 +249,7 @@ async fn clicking_on_the_confirmation_link_activates_a_user_in_db() {
 
     let saved = sqlx::query!(
         r#"
-        SELECT email, name, is_activated, is_subscribed
+        SELECT email, user_name, is_activated, is_subscribed
         FROM users
         WHERE email = $1
         "#,
@@ -260,7 +260,7 @@ async fn clicking_on_the_confirmation_link_activates_a_user_in_db() {
     .expect("Failed to fetch saved user data.");
 
     assert_eq!(saved.email, user.email);
-    assert_eq!(saved.name, user.username);
+    assert_eq!(saved.user_name, user.user_name);
     assert!(saved.is_activated);
 }
 
@@ -292,7 +292,7 @@ async fn activation_token_is_deleted_after_successful_confirmation() {
     let app = spawn_app().await;
     let user = TestUser::generate();
     let payload = serde_json::json!({
-        "name": user.username,
+        "user_name": user.user_name,
         "email": user.email,
         "password": user.password
     });

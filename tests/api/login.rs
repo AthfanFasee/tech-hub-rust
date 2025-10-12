@@ -6,7 +6,7 @@ async fn login_returns_success_for_valid_username_and_password() {
     let app = spawn_app().await;
 
     let payload = serde_json::json!({
-    "username": &app.test_user.username,
+    "user_name": &app.test_user.user_name,
     "password": &app.test_user.password
     });
 
@@ -24,7 +24,7 @@ async fn login_returns_unauthorized_for_invalid_username_or_password() {
     let app = spawn_app().await;
 
     let payload = serde_json::json!({
-    "username": &app.test_user.username,
+    "user_name": &app.test_user.user_name,
     "password": Uuid::new_v4().to_string()
     });
 
@@ -43,7 +43,7 @@ async fn login_does_not_leak_internal_error_details_on_auth_failure() {
 
     // Use a valid username but wrong password
     let payload = serde_json::json!({
-        "username": &app.test_user.username,
+        "user_name": &app.test_user.user_name,
         "password": Uuid::new_v4().to_string(),
     });
 

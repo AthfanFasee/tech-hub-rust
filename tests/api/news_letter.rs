@@ -213,7 +213,7 @@ async fn concurrent_newsletter_publishing_is_handled_gracefully() {
 async fn create_inactivated_user(app: &TestApp) -> ConfirmationLinks {
     let user = TestUser::generate();
     let payload = serde_json::json!({
-        "name": user.username,
+        "user_name": user.user_name,
         "email": user.email
     });
 

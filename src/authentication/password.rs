@@ -15,7 +15,7 @@ pub enum AuthError {
 }
 
 pub struct Credentials {
-    pub username: String,
+    pub user_name: String,
     pub password: Secret<String>,
 }
 
@@ -35,7 +35,7 @@ pub async fn validate_credentials(
     );
 
     if let Some((stored_user_id, stored_password_hash)) =
-        get_stored_credentials(&credentials.username, pool).await?
+        get_stored_credentials(&credentials.user_name, pool).await?
     {
         user_id = Some(stored_user_id);
         expected_password_hash = stored_password_hash;
@@ -81,7 +81,7 @@ async fn get_stored_credentials(
         r#"
     SELECT id, password_hash
     FROM users
-    WHERE name = $1
+    WHERE user_name = $1
     and is_activated = true
     "#,
         username,

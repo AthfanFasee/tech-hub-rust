@@ -52,7 +52,7 @@ struct SuccessResponse {
 #[derive(Deserialize)]
 pub struct UserData {
     email: String,
-    name: String,
+    user_name: String,
     password: Secret<String>,
 }
 
@@ -62,11 +62,11 @@ impl TryFrom<UserData> for NewUser {
     type Error = String;
 
     fn try_from(payload: UserData) -> Result<Self, Self::Error> {
-        let name = UserName::parse(payload.name)?;
+        let user_name = UserName::parse(payload.user_name)?;
         let email = UserEmail::parse(payload.email)?;
         let password = UserPassword::parse(payload.password.expose_secret().to_string())?;
         Ok(Self {
-            name,
+            user_name,
             email,
             password,
         })
@@ -77,7 +77,7 @@ impl TryFrom<UserData> for NewUser {
     skip_all,
     fields(
         user_email = %payload.email,
-        user_name = %payload.name,
+        user_name = %payload.user_name,
     )
 )]
 pub async fn register_user(
@@ -88,7 +88,7 @@ pub async fn register_user(
 ) -> Result<HttpResponse, UserRegisterError> {
     // ValidationError doesn't have a from or source hence we have to map this error to the correct enum variant
     let NewUser {
-        name,
+        user_name: name,
         email,
         password,
     } = payload
@@ -126,7 +126,7 @@ pub async fn register_user(
 
 #[tracing::instrument(name = "Save new user details in the database", skip_all)]
 pub async fn insert_user(
-    name: &UserName,
+    user_name: &UserName,
     email: &UserEmail,
     password: UserPassword,
     transaction: &mut Transaction<'_, Postgres>,
@@ -139,11 +139,11 @@ pub async fn insert_user(
     let user_id = Uuid::new_v4();
     let query = sqlx::query!(
         r#"
-            INSERT INTO users (id, name, email, password_hash)
+            INSERT INTO users (id, user_name, email, password_hash)
             VALUES ($1, $2, $3, $4)
            "#,
         user_id,
-        name.as_ref(),
+        user_name.as_ref(),
         email.as_ref(),
         password_hash.expose_secret()
     );
