@@ -1,11 +1,11 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT name\n        FROM users\n        WHERE id = $1\n        ",
+  "query": "\n        SELECT user_name\n        FROM users\n        WHERE id = $1\n        ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "name",
+        "name": "user_name",
         "type_info": "Text"
       }
     ],
@@ -18,5 +18,5 @@
       false
     ]
   },
-  "hash": "7e0da7b17555a4a5207a4a7f5bf0e2dc24a49b234a50ce0a457c3dfb04d93942"
+  "hash": "c0bbd40008ef1fac0c27550d58f21bbdca85327cbcf3e1837ea33246b6770ea3"
 }

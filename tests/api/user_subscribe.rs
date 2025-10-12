@@ -53,9 +53,9 @@ async fn clicking_on_the_confirm_subscription_link_subscribes_a_user_in_db() {
         r#"
         SELECT is_activated, is_subscribed
         FROM users
-        WHERE name = $1
+        WHERE user_name = $1
         "#,
-        &app.test_user.username,
+        &app.test_user.user_name,
     )
     .fetch_one(&app.db_pool)
     .await

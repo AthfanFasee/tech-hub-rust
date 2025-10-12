@@ -1,9 +1,9 @@
 use crate::authentication::UserId;
-use crate::authentication::{validate_credentials, AuthError, Credentials};
+use crate::authentication::{AuthError, Credentials, validate_credentials};
 use crate::domain::UserPassword;
 use crate::{build_error_response, error_chain_fmt};
 use actix_web::http::StatusCode;
-use actix_web::{web, HttpResponse, ResponseError};
+use actix_web::{HttpResponse, ResponseError, web};
 use anyhow::Context;
 use secrecy::ExposeSecret;
 use secrecy::Secret;
@@ -55,7 +55,8 @@ impl TryFrom<PasswordResetData> for (UserPassword, UserPassword) {
     type Error = String;
 
     fn try_from(payload: PasswordResetData) -> Result<Self, Self::Error> {
-        let current_password = UserPassword::parse(payload.current_password.expose_secret().to_string())?;
+        let current_password =
+            UserPassword::parse(payload.current_password.expose_secret().to_string())?;
         let new_password = UserPassword::parse(payload.new_password.expose_secret().to_string())?;
         Ok((current_password, new_password))
     }
@@ -75,7 +76,7 @@ pub async fn change_password(
         .map_err(PasswordResetError::BadRequest)?;
 
     let credentials = Credentials {
-        username,
+        user_name: username,
         password: current_password.into_secret(),
     };
 
@@ -95,19 +96,18 @@ pub async fn change_password(
     Ok(HttpResponse::Ok().json(success))
 }
 
-
 #[tracing::instrument(name = "Get username", skip(pool))]
 pub async fn get_username(user_id: Uuid, pool: &PgPool) -> Result<String, anyhow::Error> {
     let row = sqlx::query!(
         r#"
-        SELECT name
+        SELECT user_name
         FROM users
         WHERE id = $1
         "#,
         user_id,
     )
-        .fetch_one(pool)
-        .await
-        .context("Failed to perform a query to retrieve a username.")?;
-    Ok(row.name)
+    .fetch_one(pool)
+    .await
+    .context("Failed to perform a query to retrieve a username.")?;
+    Ok(row.user_name)
 }

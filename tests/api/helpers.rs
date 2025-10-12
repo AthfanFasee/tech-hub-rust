@@ -15,7 +15,7 @@ use wiremock::MockServer;
 #[derive(Debug)]
 pub struct TestUser {
     pub user_id: Uuid,
-    pub username: String,
+    pub user_name: String,
     pub password: String,
     pub email: String,
 }
@@ -25,7 +25,7 @@ impl TestUser {
         let random_uuid = Uuid::new_v4().to_string();
         Self {
             user_id: Uuid::new_v4(),
-            username: Uuid::new_v4().to_string(),
+            user_name: Uuid::new_v4().to_string(),
             password: Uuid::new_v4().to_string(),
             email: format!("{}@gmail.com", random_uuid),
         }
@@ -42,10 +42,10 @@ impl TestUser {
             .to_string();
 
         sqlx::query!(
-            r#"INSERT INTO users (id, name, password_hash, email, is_activated)
+            r#"INSERT INTO users (id, user_name, password_hash, email, is_activated)
             VALUES ($1, $2, $3, $4, $5)"#,
             self.user_id,
-            self.username,
+            self.user_name,
             password_hash,
             self.email,
             true,
@@ -138,7 +138,7 @@ impl TestApp {
 
     pub async fn login(&self) {
         let body = serde_json::json!({
-            "username": &self.test_user.username,
+            "user_name": &self.test_user.user_name,
             "password": &self.test_user.password,
         });
         let response = self.send_post("user/login", &body).await;
@@ -151,7 +151,7 @@ impl TestApp {
 
     pub async fn login_admin(&self) {
         let body = serde_json::json!({
-            "username": "athfan",
+            "user_name": "athfan",
             "password": "athfan123",
         });
 
