@@ -10,7 +10,7 @@ use actix_web::ResponseError;
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, web};
 use anyhow::Context;
-use secrecy::ExposeSecret;
+use secrecy::{ExposeSecret, Secret};
 use serde::Deserialize;
 use serde::Serialize;
 use sqlx::{Executor, PgPool, Postgres, Transaction};
@@ -53,7 +53,7 @@ struct SuccessResponse {
 pub struct UserData {
     email: String,
     name: String,
-    password: String,
+    password: Secret<String>,
 }
 
 // This is like saying - I know how to build myself `NewUser` from something else `UserData`
@@ -64,7 +64,7 @@ impl TryFrom<UserData> for NewUser {
     fn try_from(payload: UserData) -> Result<Self, Self::Error> {
         let name = UserName::parse(payload.name)?;
         let email = UserEmail::parse(payload.email)?;
-        let password = UserPassword::parse(payload.password)?;
+        let password = UserPassword::parse(payload.password.expose_secret().to_string())?;
         Ok(Self {
             name,
             email,

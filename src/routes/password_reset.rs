@@ -1,8 +1,9 @@
 use crate::authentication::UserId;
-use crate::authentication::{AuthError, Credentials, validate_credentials};
+use crate::authentication::{validate_credentials, AuthError, Credentials};
+use crate::domain::UserPassword;
 use crate::{build_error_response, error_chain_fmt};
 use actix_web::http::StatusCode;
-use actix_web::{HttpResponse, ResponseError, web};
+use actix_web::{web, HttpResponse, ResponseError};
 use anyhow::Context;
 use secrecy::ExposeSecret;
 use secrecy::Secret;
@@ -48,7 +49,16 @@ struct SuccessResponse {
 pub struct PasswordResetData {
     current_password: Secret<String>,
     new_password: Secret<String>,
-    new_password_check: Secret<String>,
+}
+
+impl TryFrom<PasswordResetData> for (UserPassword, UserPassword) {
+    type Error = String;
+
+    fn try_from(payload: PasswordResetData) -> Result<Self, Self::Error> {
+        let current_password = UserPassword::parse(payload.current_password.expose_secret().to_string())?;
+        let new_password = UserPassword::parse(payload.new_password.expose_secret().to_string())?;
+        Ok((current_password, new_password))
+    }
 }
 
 pub async fn change_password(
@@ -59,15 +69,14 @@ pub async fn change_password(
     let user_id = user_id.into_inner();
     let username = get_username(*user_id, &pool).await?;
 
-    let PasswordResetData {
-        current_password,
-        new_password,
-        new_password_check,
-    } = payload.into_inner();
+    let (current_password, new_password) = payload
+        .0
+        .try_into()
+        .map_err(PasswordResetError::BadRequest)?;
 
     let credentials = Credentials {
         username,
-        password: current_password,
+        password: current_password.into_secret(),
     };
 
     if let Err(e) = validate_credentials(credentials, &pool).await {
@@ -77,20 +86,7 @@ pub async fn change_password(
         };
     }
 
-    let new_pw_len = new_password.expose_secret().len();
-    if !(12..=128).contains(&new_pw_len) {
-        return Err(PasswordResetError::BadRequest(
-            "New password must be between 12 and 128 characters".into(),
-        ));
-    }
-
-    if new_password.expose_secret() != new_password_check.expose_secret() {
-        return Err(PasswordResetError::BadRequest(
-            "New Passwords do not match".into(),
-        ));
-    };
-
-    crate::authentication::change_password(*user_id, new_password, &pool).await?;
+    crate::authentication::change_password(*user_id, new_password.into_secret(), &pool).await?;
 
     let success = SuccessResponse {
         code: 200,
@@ -98,6 +94,7 @@ pub async fn change_password(
     };
     Ok(HttpResponse::Ok().json(success))
 }
+
 
 #[tracing::instrument(name = "Get username", skip(pool))]
 pub async fn get_username(user_id: Uuid, pool: &PgPool) -> Result<String, anyhow::Error> {
@@ -109,8 +106,8 @@ pub async fn get_username(user_id: Uuid, pool: &PgPool) -> Result<String, anyhow
         "#,
         user_id,
     )
-    .fetch_one(pool)
-    .await
-    .context("Failed to perform a query to retrieve a username.")?;
+        .fetch_one(pool)
+        .await
+        .context("Failed to perform a query to retrieve a username.")?;
     Ok(row.name)
 }
