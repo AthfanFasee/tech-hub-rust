@@ -188,7 +188,7 @@ pub async fn send_confirmation_email(
     base_url: &str,
     token: &str,
 ) -> Result<(), EmailError> {
-    let confirmation_link = format!("{base_url}/user/confirm?token={token}");
+    let confirmation_link = format!("{base_url}/v1/user/confirm/register?token={token}");
     let plain_body =
         format!("Welcome to TechHub!\nVisit {confirmation_link} to confirm your registration.",);
     let html_body = format!(

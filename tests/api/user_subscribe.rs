@@ -69,7 +69,7 @@ async fn clicking_on_the_confirm_subscription_link_subscribes_a_user_in_db() {
 async fn subscribe_user_requests_without_token_are_rejected_with_a_400() {
     let app = spawn_app().await;
 
-    let response = reqwest::get(&format!("{}/user/confirm/subscribe", app.address))
+    let response = reqwest::get(&format!("{}/v1/user/confirm/subscribe", app.address))
         .await
         .unwrap();
     assert_eq!(response.status().as_u16(), 400);
@@ -80,7 +80,7 @@ async fn subscribe_user_with_invalid_token_returns_401() {
     let app = spawn_app().await;
 
     let response = reqwest::get(&format!(
-        "{}/user/confirm/subscribe?token=not-a-real-token",
+        "{}/v1/user/confirm/subscribe?token=not-a-real-token",
         app.address
     ))
     .await
