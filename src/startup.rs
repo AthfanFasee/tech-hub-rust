@@ -1,14 +1,9 @@
-use crate::authentication::{reject_anonymous_users, reject_non_admin_users};
 use crate::configuration::{Configuration, DatabaseConfigs};
 use crate::email_client::EmailClient;
-use crate::routes::{
-    change_password, confirm_user_activation, health_check, log_out, login, protected_endpoint,
-    publish_newsletter, register_user, send_subscribe_email, subscribe_user,
-};
+use crate::routes::{admin_routes, health_check, user_routes};
 use actix_session::SessionMiddleware;
 use actix_session::storage::RedisSessionStore;
 use actix_web::dev::Server;
-use actix_web::middleware::from_fn;
 use actix_web::{App, HttpServer, web};
 use anyhow::Context;
 use secrecy::{ExposeSecret, Secret};
@@ -90,25 +85,7 @@ async fn run(
                 redis_store.clone(),
                 secret_key.clone(),
             ))
-            .route("/health_check", web::get().to(health_check))
-            .route("/user/login", web::post().to(login))
-            .route("/user/register", web::post().to(register_user))
-            .route("/user/confirm", web::get().to(confirm_user_activation))
-            .route("/user/confirm/subscribe", web::get().to(subscribe_user))
-            // these routes go through the authentication middleware
-            .service(
-                web::scope("/user")
-                    .wrap(from_fn(reject_anonymous_users))
-                    .route("/reset-password", web::post().to(change_password))
-                    .route("/logout", web::post().to(log_out))
-                    .route("/email/subscribe", web::get().to(send_subscribe_email))
-                    .route("/protected", web::get().to(protected_endpoint)),
-            )
-            .service(
-                web::scope("/admin")
-                    .wrap(from_fn(reject_non_admin_users))
-                    .route("/newsletters/publish", web::post().to(publish_newsletter)),
-            )
+            .configure(configure_routes)
             // register the db connection as part of the application state
             .app_data(db_pool.clone())
             .app_data(email_client.clone())
@@ -123,3 +100,12 @@ async fn run(
 
 #[derive(Clone)]
 pub struct HmacSecret(pub Secret<String>);
+
+pub fn configure_routes(cfg: &mut web::ServiceConfig) {
+    cfg.route("/health_check", web::get().to(health_check))
+        .service(
+            web::scope("/v1")
+                .service(web::scope("/user").configure(user_routes))
+                .service(web::scope("/admin").configure(admin_routes)),
+        );
+}

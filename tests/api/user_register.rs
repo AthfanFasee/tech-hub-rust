@@ -268,7 +268,7 @@ async fn clicking_on_the_confirmation_link_activates_a_user_in_db() {
 async fn confirm_activation_requests_without_token_are_rejected_with_a_400() {
     let app = spawn_app().await;
 
-    let response = reqwest::get(&format!("{}/user/confirm", app.address))
+    let response = reqwest::get(&format!("{}/v1/user/confirm/register", app.address))
         .await
         .unwrap();
     assert_eq!(response.status().as_u16(), 400);
@@ -279,7 +279,7 @@ async fn confirm_user_with_invalid_token_returns_401() {
     let app = spawn_app().await;
 
     let response = reqwest::get(&format!(
-        "{}/user/confirm?token=not-a-real-token",
+        "{}/v1/user/confirm/register?token=not-a-real-token",
         app.address
     ))
     .await

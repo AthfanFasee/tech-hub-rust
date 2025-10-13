@@ -124,7 +124,7 @@ pub async fn send_subscription_email(
     base_url: &str,
     token: &str,
 ) -> Result<(), EmailError> {
-    let confirmation_link = format!("{base_url}/user/confirm/subscribe?token={token}");
+    let confirmation_link = format!("{base_url}/v1/user/confirm/subscribe?token={token}");
     let plain_body = format!(
         "Welcome to TechHub Newsletter!\nVisit {confirmation_link} to confirm your subscription to our newsletter.",
     );

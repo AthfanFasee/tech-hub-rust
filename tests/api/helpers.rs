@@ -77,11 +77,9 @@ pub struct ConfirmationLinks {
 }
 
 impl TestApp {
-    /// Extract the confirmation links embedded in the request to the email API.
     pub fn get_confirmation_links(&self, email_request: &wiremock::Request) -> ConfirmationLinks {
         let body: Value = serde_json::from_slice(&email_request.body).unwrap();
 
-        // Extract the link from one of the request fields.
         let get_link = |s: &str| {
             let links: Vec<_> = linkify::LinkFinder::new()
                 .links(s)
@@ -91,7 +89,6 @@ impl TestApp {
             let raw_link = links[0].as_str().to_owned();
             let mut confirmation_link = reqwest::Url::parse(&raw_link).unwrap();
 
-            // Make sure correct API is called
             assert_eq!(confirmation_link.host_str().unwrap(), "127.0.0.1");
 
             confirmation_link.set_port(Some(self.port)).unwrap();
@@ -136,7 +133,7 @@ impl TestApp {
     }
 
     pub async fn register_user(&self, payload: &Value) -> Response {
-        self.send_post("user/register", payload).await
+        self.send_post("v1/user/register", payload).await
     }
 
     pub async fn login(&self) {
@@ -144,12 +141,12 @@ impl TestApp {
             "user_name": &self.test_user.user_name,
             "password": &self.test_user.password,
         });
-        let response = self.send_post("user/login", &body).await;
+        let response = self.send_post("v1/user/login", &body).await;
         assert_eq!(response.status().as_u16(), 200);
     }
 
     pub async fn login_with(&self, creds: &Value) -> Response {
-        self.send_post("user/login", creds).await
+        self.send_post("v1/user/login", creds).await
     }
 
     pub async fn login_admin(&self) {
@@ -158,20 +155,21 @@ impl TestApp {
             "password": "athfan123",
         });
 
-        let response = self.send_post("user/login", &body).await;
+        let response = self.send_post("v1/user/login", &body).await;
         assert_eq!(response.status().as_u16(), 200);
     }
 
     pub async fn change_password(&self, payload: &Value) -> Response {
-        self.send_post("user/reset-password", payload).await
+        self.send_post("v1/user/me/reset-password", payload).await
     }
 
     pub async fn logout(&self) -> Response {
-        self.send_post("user/logout", &serde_json::json!({})).await
+        self.send_post("v1/user/me/logout", &serde_json::json!({}))
+            .await
     }
 
     pub async fn access_protected(&self) -> Response {
-        self.send_get("user/protected").await
+        self.send_get("v1/user/me/protected").await
     }
 
     pub async fn publish_newsletters(
@@ -182,15 +180,16 @@ impl TestApp {
         if let Some(key) = idempotency_key {
             let mut headers = HeaderMap::new();
             headers.insert("Idempotency-Key", key.parse().unwrap());
-            self.send_post_with_headers("admin/newsletters/publish", payload, &headers)
+            self.send_post_with_headers("v1/admin/me/newsletters/publish", payload, &headers)
                 .await
         } else {
-            self.send_post("admin/newsletters/publish", payload).await
+            self.send_post("v1/admin/me/newsletters/publish", payload)
+                .await
         }
     }
 
     pub async fn send_subscribe_email(&self) -> Response {
-        self.send_get("user/email/subscribe").await
+        self.send_get("v1/user/me/email/subscribe").await
     }
 
     pub async fn dispatch_all_pending_newsletter_emails(&self) {
