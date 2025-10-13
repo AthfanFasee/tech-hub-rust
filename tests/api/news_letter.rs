@@ -222,7 +222,69 @@ async fn concurrent_newsletter_publishing_is_handled_gracefully() {
     app.dispatch_all_pending_newsletter_emails().await;
 }
 
-async fn create_inactivated_user(app: &TestApp) -> (String, String, ConfirmationLinks) {
+#[tokio::test]
+async fn failed_newsletter_delivery_is_retried_with_back_off() {
+    let app = spawn_app().await;
+    create_active_subscriber(&app).await;
+    app.login_admin().await;
+
+    Mock::given(path("/email"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(500))
+        .mount(&app.email_server)
+        .await;
+
+    // Publish newsletter
+    let newsletter_body = serde_json::json!({
+        "title": "Test Newsletter",
+        "content": {
+            "text": "Hello subscribers!",
+            "html": "<p>Hello subscribers!</p>"
+        }
+    });
+
+    let key = uuid::Uuid::new_v4().to_string();
+    let response = app.publish_newsletters(&newsletter_body, Some(&key)).await;
+    assert_eq!(response.status().as_u16(), 200);
+
+    // Fetch the single delivery task created
+    let tasks = sqlx::query!(
+        r#"
+        SELECT newsletter_issue_id, user_email, n_retries, execute_after
+        FROM issue_delivery_queue
+        "#,
+    )
+    .fetch_all(&app.db_pool)
+    .await
+    .expect("Expected to query issue_delivery_queue");
+
+    assert_eq!(tasks.len(), 1, "Expected exactly one delivery task");
+    let task = &tasks[0];
+
+    app.dispatch_all_pending_newsletter_emails().await;
+
+    // Assert that record still exists after failure, retry count incremented, execute_after is set to future
+    let record = sqlx::query!(
+        r#"
+        SELECT n_retries, execute_after
+        FROM issue_delivery_queue
+        WHERE newsletter_issue_id = $1 AND user_email = $2
+        "#,
+        task.newsletter_issue_id,
+        task.user_email
+    )
+    .fetch_one(&app.db_pool)
+    .await
+    .expect("Expected task to still exist after retry");
+
+    assert_eq!(record.n_retries, 1, "Retry count should increment");
+    assert!(
+        record.execute_after > chrono::Utc::now(),
+        "execute_after should be in the future"
+    );
+}
+
+async fn create_inactivated_user(app: &TestApp) -> (serde_json::Value, ConfirmationLinks) {
     let user = TestUser::generate();
     let payload = serde_json::json!({
         "user_name": user.user_name,
@@ -252,26 +314,21 @@ async fn create_inactivated_user(app: &TestApp) -> (String, String, Confirmation
         .unwrap();
 
     let confirmation_links = app.get_confirmation_links(email_request);
-    (user.user_name, user.password, confirmation_links)
+    (payload, confirmation_links)
 }
 
-async fn create_activated_user(app: &TestApp) -> (String, String) {
-    let (user_name, password, confirmation_link) = create_inactivated_user(app).await;
+async fn create_activated_user(app: &TestApp) -> serde_json::Value {
+    let (payload, confirmation_link) = create_inactivated_user(app).await;
     reqwest::get(confirmation_link.html)
         .await
         .unwrap()
         .error_for_status()
         .unwrap();
-    (user_name, password)
+    payload
 }
 
 pub async fn create_active_subscriber(app: &TestApp) {
-    let (user_name, password) = create_activated_user(app).await;
-
-    let payload = serde_json::json!({
-        "user_name": &user_name,
-        "password": &password,
-    });
+    let payload = create_activated_user(app).await;
 
     let response = app.login_with(&payload).await;
     assert_eq!(response.status().as_u16(), 200);

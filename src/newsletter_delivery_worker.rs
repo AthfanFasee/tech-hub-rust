@@ -28,7 +28,11 @@ async fn worker_loop(pool: PgPool, email_client: EmailClient) -> Result<(), anyh
         let mut rng = StdRng::from_entropy();
         loop {
             if let Err(e) = cleanup_old_idempotency_records(&pool_for_cleanup).await {
-                tracing::error!(error = ?e, "Idempotency cleanup failed");
+                tracing::error!(
+                    error.cause_chain = ?e,
+                    error.message = %e,
+                    "Idempotency cleanup failed"
+                );
             }
 
             // This random jitter will ensure multiple instances of app won't clean db at same time
@@ -57,7 +61,12 @@ async fn worker_loop(pool: PgPool, email_client: EmailClient) -> Result<(), anyh
             }
 
             Err(e) => {
-                tracing::warn!(error = ?e, "Transient failure while executing task");
+                tracing::error!(
+                    error.cause_chain = ?e,
+                    error.message = %e,
+                    "Transient failure while executing task"
+                );
+
                 // Add 0–20% random jitter to avoid sync storms
                 let jitter = rng.gen_range(0.0..=0.2);
                 let sleep_duration = Duration::from_secs_f64(backoff_secs as f64 * (1.0 + jitter));
@@ -73,88 +82,188 @@ async fn worker_loop(pool: PgPool, email_client: EmailClient) -> Result<(), anyh
 #[tracing::instrument(
     skip_all,
     fields(
-        newsletter_issue_id=tracing::field::Empty,
-        subscriber_email=tracing::field::Empty
+        newsletter_issue_id = tracing::field::Empty,
+        email = tracing::field::Empty
     ),
 )]
 pub async fn try_execute_task(
     pool: &PgPool,
     email_client: &EmailClient,
 ) -> Result<ExecutionOutcome, anyhow::Error> {
-    let task = dequeue_task(pool).await?;
-    if task.is_none() {
+    // Fetch a pending delivery task (row locked until commit/rollback)
+    let maybe_task = dequeue_task(pool).await?;
+    if maybe_task.is_none() {
         return Ok(ExecutionOutcome::EmptyQueue);
     }
-    let (transaction, issue_id, email) = task.unwrap();
+
+    let (mut transaction, issue_id, email, n_retries) = maybe_task.unwrap();
 
     Span::current()
         .record("newsletter_issue_id", display(issue_id))
         .record("subscriber_email", display(&email));
 
-    match UserEmail::parse(email.clone()) {
-        Ok(email) => {
-            let issue = get_newsletter_issue(pool, issue_id).await?;
-            if let Err(e) = email_client
-                .send_email(
-                    &email,
-                    &issue.title,
-                    &issue.html_content,
-                    &issue.text_content,
-                )
+    // Process the task within the same transaction
+    let result =
+        process_delivery_task(&mut transaction, issue_id, &email, n_retries, email_client).await;
+
+    // Finalize transaction
+    match result {
+        Ok(_) => {
+            transaction
+                .commit()
                 .await
-            {
-                tracing::error!(
-                error.cause_chain = ?e,
-                error.message = %e,
-                "Failed to deliver news letter issue to a subscribed user. \
-                Skipping.",
-                );
-            }
+                .context("Failed to commit transaction after processing newsletter issue")?;
+        }
+        Err(e) => {
+            tracing::error!(error = ?e, "Task failed, rolling back transaction");
+            transaction
+                .rollback()
+                .await
+                .context("Failed to rollback transaction after newsletter delivery failure")?;
+        }
+    }
+
+    Ok(ExecutionOutcome::TaskCompleted)
+}
+
+#[tracing::instrument(
+    skip_all,
+    fields(
+        newsletter_issue_id = %issue_id,
+        email = %email
+    ),
+)]
+async fn process_delivery_task(
+    transaction: &mut PgTransaction,
+    issue_id: Uuid,
+    email: &str,
+    n_retries: i32,
+    email_client: &EmailClient,
+) -> Result<(), anyhow::Error> {
+    let Ok(valid_email) = UserEmail::parse(email.to_string()) else {
+        tracing::error!(
+            %email,
+            "Invalid subscriber email — deleting newsletter issue task permanently"
+        );
+        delete_task(transaction, issue_id, email).await?;
+        return Ok(());
+    };
+
+    // Fetch issue content
+    let issue = get_newsletter_issue(transaction, issue_id).await?;
+
+    // Try sending the email
+    match email_client
+        .send_email(
+            &valid_email,
+            &issue.title,
+            &issue.html_content,
+            &issue.text_content,
+        )
+        .await
+    {
+        Ok(_) => {
+            // success, remove from queue
+            delete_task(transaction, issue_id, email).await?;
         }
         Err(e) => {
             tracing::error!(
-            error.cause_chain = ?e,
-            error.message = %e,
-            "Skipping a subscribed user. \
-            Their stored contact details are invalid",
+                error.cause_chain = ?e,
+                error.message = %e,
+                "Failed to deliver newsletter, will retry later."
             );
+            retry_task(transaction, issue_id, email, n_retries).await?;
         }
     }
-    delete_task(transaction, issue_id, &email).await?;
-    Ok(ExecutionOutcome::TaskCompleted)
+
+    Ok(())
 }
 
 type PgTransaction = Transaction<'static, Postgres>;
 
 async fn dequeue_task(
     pool: &PgPool,
-) -> Result<Option<(PgTransaction, Uuid, String)>, anyhow::Error> {
+) -> Result<Option<(PgTransaction, Uuid, String, i32)>, anyhow::Error> {
     let mut transaction = pool
         .begin()
         .await
         .context("Failed to start a transaction")?;
+
     let r = sqlx::query!(
         r#"
-        SELECT newsletter_issue_id, user_email
+        SELECT newsletter_issue_id, user_email, n_retries
         FROM issue_delivery_queue
+        WHERE execute_after <= NOW()
         FOR UPDATE
         SKIP LOCKED
         LIMIT 1
-        "#,
+        "#
     )
     .fetch_optional(transaction.deref_mut())
     .await
     .context("Failed dequeue a newsletter issue task from db")?;
 
     if let Some(r) = r {
-        Ok(Some((transaction, r.newsletter_issue_id, r.user_email)))
+        Ok(Some((
+            transaction,
+            r.newsletter_issue_id,
+            r.user_email,
+            r.n_retries,
+        )))
     } else {
         Ok(None)
     }
 }
-#[tracing::instrument(skip(transaction, email))]
+
+#[tracing::instrument(
+    skip_all,
+    fields(
+        newsletter_issue_id = %issue_id,
+        email = %email
+    ),
+)]
+async fn retry_task(
+    transaction: &mut PgTransaction,
+    issue_id: Uuid,
+    email: &str,
+    current_retry: i32,
+) -> Result<(), anyhow::Error> {
+    let next_retry = current_retry + 1;
+
+    // give up after 5 attempts
+    if next_retry > 5 {
+        tracing::error!(%issue_id, "Max retries reached, dropping newsletter issue task permanently");
+        delete_task(transaction, issue_id, email).await?;
+        return Ok(());
+    }
+
+    // Exponential backoff: 1m, 2m, 4m, 8m, 16m, 32m, 60m
+    let base_delay_secs = 60 * (1 << (next_retry - 1)).min(60);
+    let jitter_secs: i64 = rand::thread_rng().gen_range(0..=30);
+    let total_delay_secs = (base_delay_secs + jitter_secs) as f64;
+
+    let query = sqlx::query!(
+        r#"
+        UPDATE issue_delivery_queue
+        SET n_retries = $3,
+            execute_after = NOW() + ($4 * INTERVAL '1 second')
+        WHERE newsletter_issue_id = $1 AND user_email = $2
+        "#,
+        issue_id,
+        email,
+        next_retry,
+        total_delay_secs
+    );
+    transaction
+        .execute(query)
+        .await
+        .context("Failed to update a newsletter issue task with retry later info")?;
+
+    Ok(())
+}
+
 async fn delete_task(
-    mut transaction: PgTransaction,
+    transaction: &mut PgTransaction,
     issue_id: Uuid,
     email: &str,
 ) -> Result<(), anyhow::Error> {
@@ -172,10 +281,7 @@ async fn delete_task(
         .execute(query)
         .await
         .context("Failed delete a newsletter issue task from db")?;
-    transaction
-        .commit()
-        .await
-        .context("Failed to commit a transaction")?;
+
     Ok(())
 }
 
@@ -186,26 +292,25 @@ struct NewsletterIssue {
 }
 
 async fn get_newsletter_issue(
-    pool: &PgPool,
+    transaction: &mut PgTransaction,
     issue_id: Uuid,
 ) -> Result<NewsletterIssue, anyhow::Error> {
     let issue = sqlx::query_as!(
         NewsletterIssue,
         r#"
-    SELECT title, text_content, html_content
-    FROM newsletter_issues
-    WHERE
-    id = $1
-    "#,
+        SELECT title, text_content, html_content
+        FROM newsletter_issues
+        WHERE id = $1
+        "#,
         issue_id
     )
-    .fetch_one(pool)
+    .fetch_one(&mut **transaction)
     .await
-    .context("Failed get a newsletter issue details")?;
+    .context("Failed to get newsletter issue details")?;
+
     Ok(issue)
 }
 
-#[tracing::instrument(skip(pool))]
 pub async fn cleanup_old_idempotency_records(pool: &PgPool) -> Result<(), anyhow::Error> {
     let deleted =
         sqlx::query!(r#"DELETE FROM idempotency WHERE created_at < NOW() - INTERVAL '24 hours'"#)
