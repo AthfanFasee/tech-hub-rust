@@ -142,7 +142,7 @@ pub async fn get_user_email(user_id: Uuid, pool: &PgPool) -> Result<String, anyh
         r#"
         SELECT email
         FROM users
-        WHERE id = $1
+        WHERE id = $1 and is_activated = true
         "#,
         user_id,
     )
