@@ -105,7 +105,7 @@ pub async fn get_username(user_id: Uuid, pool: &PgPool) -> Result<String, anyhow
         r#"
         SELECT user_name
         FROM users
-        WHERE id = $1
+        WHERE id = $1 and is_activated = true
         "#,
         user_id,
     )

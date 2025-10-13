@@ -105,13 +105,12 @@ async fn insert_newsletter_issue(
     let query = sqlx::query!(
         r#"
         INSERT INTO newsletter_issues (
-        newsletter_issue_id,
+        id,
         title,
         text_content,
-        html_content,
-        published_at
+        html_content
         )
-        VALUES ($1, $2, $3, $4, now())
+        VALUES ($1, $2, $3, $4)
         "#,
         newsletter_issue_id,
         title,

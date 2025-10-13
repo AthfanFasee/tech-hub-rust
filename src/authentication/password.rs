@@ -105,7 +105,7 @@ pub async fn change_password(
         r#"
         UPDATE users
         SET password_hash = $1
-        WHERE id = $2
+        WHERE id = $2 and is_activated = true
         "#,
         password_hash.expose_secret(),
         user_id

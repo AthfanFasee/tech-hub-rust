@@ -158,7 +158,7 @@ async fn get_newsletter_issue(
     SELECT title, text_content, html_content
     FROM newsletter_issues
     WHERE
-    newsletter_issue_id = $1
+    id = $1
     "#,
         issue_id
     )

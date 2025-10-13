@@ -1,9 +1,7 @@
-CREATE TABLE newsletter_issues
-(
-    newsletter_issue_id uuid NOT NULL,
-    title               TEXT NOT NULL,
-    text_content        TEXT NOT NULL,
-    html_content        TEXT NOT NULL,
-    published_at        TEXT NOT NULL,
-    PRIMARY KEY (newsletter_issue_id)
+CREATE TABLE IF NOT EXISTS newsletter_issues(
+id UUID PRIMARY KEY NOT NULL,
+title TEXT NOT NULL,
+text_content TEXT NOT NULL,
+html_content TEXT NOT NULL,
+created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
