@@ -1,5 +1,6 @@
 mod health_check;
 mod helpers;
+mod idempotency;
 mod login;
 mod news_letter;
 mod password_reset;
