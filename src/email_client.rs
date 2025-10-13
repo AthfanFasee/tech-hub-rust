@@ -2,6 +2,7 @@ use crate::domain::UserEmail;
 use reqwest::{Client, Url};
 use secrecy::{ExposeSecret, Secret};
 
+#[derive(Debug)]
 pub struct EmailClient {
     http_client: Client,
     base_url: Url,

@@ -7,6 +7,8 @@ use serde_json::Value;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::sync::OnceLock;
 use techhub::configuration::{DatabaseConfigs, get_config};
+use techhub::email_client::EmailClient;
+use techhub::issue_delivery_worker::{ExecutionOutcome, try_execute_task};
 use techhub::startup::{Application, get_connection_pool};
 use techhub::telemetry;
 use uuid::Uuid;
@@ -65,6 +67,7 @@ pub struct TestApp {
     pub port: u16,
     pub test_user: TestUser,
     pub api_client: reqwest::Client,
+    pub email_client: EmailClient,
 }
 
 // Confirmation links embedded in the request to the email API.
@@ -189,6 +192,18 @@ impl TestApp {
     pub async fn send_subscribe_email(&self) -> Response {
         self.send_get("user/email/subscribe").await
     }
+
+    pub async fn dispatch_all_pending_newsletter_emails(&self) {
+        loop {
+            if let ExecutionOutcome::EmptyQueue =
+                try_execute_task(&self.db_pool, &self.email_client)
+                    .await
+                    .unwrap()
+            {
+                break;
+            }
+        }
+    }
 }
 
 // Ensure that the `tracing` stack is only initialised once using `OnceLock`
@@ -257,6 +272,7 @@ pub async fn spawn_app() -> TestApp {
         email_server,
         test_user: TestUser::generate(),
         api_client: client,
+        email_client: configuration.email_client.client(),
     };
 
     test_app

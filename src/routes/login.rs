@@ -36,13 +36,13 @@ impl ResponseError for LoginError {
 
 #[derive(serde::Deserialize)]
 pub struct LoginData {
-    username: String,
+    user_name: String,
     password: Secret<String>,
 }
 
 #[tracing::instrument(
     skip_all,
-    fields(username=tracing::field::Empty, user_id=tracing::field::Empty)
+    fields(user_name=tracing::field::Empty)
 )]
 pub async fn login(
     payload: web::Json<LoginData>,
@@ -50,11 +50,11 @@ pub async fn login(
     session: TypedSession,
 ) -> Result<HttpResponse, LoginError> {
     let credentials = Credentials {
-        username: payload.0.username,
+        user_name: payload.0.user_name,
         password: payload.0.password,
     };
 
-    tracing::Span::current().record("username", tracing::field::display(&credentials.username));
+    tracing::Span::current().record("user_name", tracing::field::display(&credentials.user_name));
     let user_id = validate_credentials(credentials, &pool)
         .await
         .map_err(|e| match e {
@@ -69,7 +69,6 @@ pub async fn login(
     session.insert_user_id(user_id)?;
     session.insert_is_admin(is_admin)?;
 
-    tracing::Span::current().record("user_id", tracing::field::display(&user_id));
     Ok(HttpResponse::Ok().finish())
 }
 
@@ -82,7 +81,6 @@ pub async fn protected_endpoint() -> Result<HttpResponse, LoginError> {
     Ok(HttpResponse::Ok().finish())
 }
 
-#[tracing::instrument(name = "Check if user has admin privileges", skip(pool))]
 pub async fn is_admin_user(user_id: Uuid, pool: &PgPool) -> Result<bool, anyhow::Error> {
     let record = sqlx::query!(
         r#"

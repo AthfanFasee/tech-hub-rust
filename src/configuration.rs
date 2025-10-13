@@ -1,8 +1,10 @@
 use crate::domain::UserEmail;
+use crate::email_client::EmailClient;
 use secrecy::{ExposeSecret, Secret};
 use serde;
 use sqlx::postgres::PgConnectOptions;
 use sqlx::postgres::PgSslMode;
+use url::Url;
 
 #[derive(serde::Deserialize, Clone)]
 pub struct EmailClientSettings {
@@ -13,6 +15,17 @@ pub struct EmailClientSettings {
 }
 
 impl EmailClientSettings {
+    pub fn client(self) -> EmailClient {
+        let sender_email = self.sender().expect("Invalid sender email address.");
+        let timeout = self.timeout();
+        EmailClient::new(
+            Url::parse(&self.base_url).expect("Invalid email client base URL"),
+            sender_email,
+            self.authorization_token,
+            timeout,
+        )
+    }
+
     pub fn sender(&self) -> Result<UserEmail, String> {
         UserEmail::parse(self.sender_email.clone())
     }

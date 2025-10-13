@@ -59,7 +59,7 @@ migrate-add:
 	fi
 	sqlx migrate add $(name)
 
-# Migrate command: performs sql query caching for sqlx, creates the db in docker container, migrates the db
+# Migrate command: performs sql query caching for sqlx, creates the db in docker container if required, migrates the db
 migrate:
 	@echo "Running db migrations (skip docker)..."
 	SKIP_DOCKER=true ./scripts/init_db.sh
