@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT newsletter_issue_id, user_email, n_retries\n        FROM issue_delivery_queue\n        WHERE execute_after <= NOW()\n        FOR UPDATE\n        SKIP LOCKED\n        LIMIT 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "newsletter_issue_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_email",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "n_retries",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "1587cb8299679d15301580b0340e967e3a47774b5eca793a0be38a738a390ca1"
+}

@@ -34,7 +34,7 @@ async fn old_idempotency_records_are_cleaned_up() {
 
     cleanup_old_idempotency_records(pool).await.unwrap();
 
-    // The old record should be gone
+    // The old record should be deleted
     let old_exists = sqlx::query_scalar!(
         r#"SELECT EXISTS(SELECT 1 FROM idempotency WHERE idempotency_key = $1)"#,
         "old-key"
