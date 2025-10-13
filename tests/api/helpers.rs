@@ -8,7 +8,7 @@ use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::sync::OnceLock;
 use techhub::configuration::{DatabaseConfigs, get_config};
 use techhub::email_client::EmailClient;
-use techhub::issue_delivery_worker::{ExecutionOutcome, try_execute_task};
+use techhub::newsletter_delivery_worker::{ExecutionOutcome, try_execute_task};
 use techhub::startup::{Application, get_connection_pool};
 use techhub::telemetry;
 use uuid::Uuid;

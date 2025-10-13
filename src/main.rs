@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Display};
 use techhub::configuration;
-use techhub::issue_delivery_worker::run_worker_until_stopped;
+use techhub::newsletter_delivery_worker::run_worker_until_stopped;
 use techhub::startup::Application;
 use techhub::telemetry;
 use tokio::task::JoinError;
