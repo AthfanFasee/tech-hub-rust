@@ -26,6 +26,8 @@ async fn newsletters_are_not_delivered_to_inactivated_user() {
     let key = uuid::Uuid::new_v4().to_string();
     let response = app.publish_newsletters(&newsletter_body, Some(&key)).await;
     assert_eq!(response.status().as_u16(), 200);
+
+    app.dispatch_all_pending_newsletter_emails().await;
 }
 
 #[tokio::test]
@@ -52,6 +54,8 @@ async fn newsletters_are_not_delivered_to_confirmed_but_unsubscribed_users() {
     let key = uuid::Uuid::new_v4().to_string();
     let response = app.publish_newsletters(&newsletter_body, Some(&key)).await;
     assert_eq!(response.status().as_u16(), 200);
+
+    app.dispatch_all_pending_newsletter_emails().await;
 }
 
 #[tokio::test]
@@ -79,6 +83,8 @@ async fn newsletters_returns_400_for_invalid_data() {
             "Did not return 400 when payload was {desc}"
         );
     }
+
+    app.dispatch_all_pending_newsletter_emails().await;
 }
 
 #[tokio::test]
@@ -141,6 +147,8 @@ async fn newsletters_are_delivered_to_a_user_who_subscribed_via_the_full_flow() 
     let key = uuid::Uuid::new_v4().to_string();
     let response = app.publish_newsletters(&newsletter_body, Some(&key)).await;
     assert_eq!(response.status().as_u16(), 200);
+
+    app.dispatch_all_pending_newsletter_emails().await;
 }
 
 #[tokio::test]
@@ -171,6 +179,8 @@ async fn newsletter_publishing_is_idempotent() {
     assert_eq!(response.status().as_u16(), 200);
     let response = app.publish_newsletters(&newsletter_body, Some(&key)).await;
     assert_eq!(response.status().as_u16(), 200);
+
+    app.dispatch_all_pending_newsletter_emails().await;
 }
 
 #[tokio::test]
@@ -208,13 +218,16 @@ async fn concurrent_newsletter_publishing_is_handled_gracefully() {
         response1.text().await.unwrap(),
         response2.text().await.unwrap()
     );
+
+    app.dispatch_all_pending_newsletter_emails().await;
 }
 
-async fn create_inactivated_user(app: &TestApp) -> ConfirmationLinks {
+async fn create_inactivated_user(app: &TestApp) -> (String, String, ConfirmationLinks) {
     let user = TestUser::generate();
     let payload = serde_json::json!({
         "user_name": user.user_name,
-        "email": user.email
+        "email": user.email,
+        "password": user.password,
     });
 
     let _mock_guard = Mock::given(path("/email"))
@@ -238,22 +251,30 @@ async fn create_inactivated_user(app: &TestApp) -> ConfirmationLinks {
         .pop()
         .unwrap();
 
-    app.get_confirmation_links(email_request)
+    let confirmation_links = app.get_confirmation_links(email_request);
+    (user.user_name, user.password, confirmation_links)
 }
 
-async fn create_activated_user(app: &TestApp) {
-    // Reuse `create_inactivated_user` helper and add an extra step to actually call the confirmation link!
-    let confirmation_link = create_inactivated_user(app).await;
+async fn create_activated_user(app: &TestApp) -> (String, String) {
+    let (user_name, password, confirmation_link) = create_inactivated_user(app).await;
     reqwest::get(confirmation_link.html)
         .await
         .unwrap()
         .error_for_status()
         .unwrap();
+    (user_name, password)
 }
 
 pub async fn create_active_subscriber(app: &TestApp) {
-    // Log in as test user who is not subscribed by default
-    app.login().await;
+    let (user_name, password) = create_activated_user(app).await;
+
+    let payload = serde_json::json!({
+        "user_name": &user_name,
+        "password": &password,
+    });
+
+    let response = app.login_with(&payload).await;
+    assert_eq!(response.status().as_u16(), 200);
 
     let _mock_guard = Mock::given(path("/email"))
         .and(method("POST"))
@@ -268,8 +289,8 @@ pub async fn create_active_subscriber(app: &TestApp) {
     // Stimulate that user will be clicking confirmation email outside our app by logging out
     app.logout().await;
 
-    // Extract confirmation link and "click" it
-    let email_request = &app.email_server.received_requests().await.unwrap()[0];
+    // Extract confirmation link from subscription email and "click" it
+    let email_request = &app.email_server.received_requests().await.unwrap()[1];
     let confirmation_links = app.get_confirmation_links(email_request);
     reqwest::get(confirmation_links.html)
         .await

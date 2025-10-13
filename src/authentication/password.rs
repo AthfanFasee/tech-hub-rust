@@ -19,7 +19,7 @@ pub struct Credentials {
     pub password: Secret<String>,
 }
 
-#[tracing::instrument(name = "Validate credentials", skip_all)]
+#[tracing::instrument(skip_all)]
 pub async fn validate_credentials(
     credentials: Credentials,
     pool: &PgPool,
@@ -55,7 +55,6 @@ pub async fn validate_credentials(
         .map_err(AuthError::InvalidCredentials)
 }
 
-#[tracing::instrument(name = "Verify password hash", skip_all)]
 fn verify_password_hash(
     expected_password_hash: Secret<String>,
     password_candidate: Secret<String>,
@@ -72,29 +71,28 @@ fn verify_password_hash(
         .map_err(AuthError::InvalidCredentials)
 }
 
-#[tracing::instrument(name = "Get stored credentials", skip_all)]
 async fn get_stored_credentials(
     username: &str,
     pool: &PgPool,
 ) -> Result<Option<(uuid::Uuid, Secret<String>)>, anyhow::Error> {
     let row = sqlx::query!(
         r#"
-    SELECT id, password_hash
-    FROM users
-    WHERE user_name = $1
-    and is_activated = true
-    "#,
+        SELECT id, password_hash
+        FROM users
+        WHERE user_name = $1
+        and is_activated = true
+        "#,
         username,
     )
     .fetch_optional(pool)
     .await
     .context("Failed to perform a query to retrieve stored credentials.")?
-    // At this point, row is an `Option<Row>`. After this, the variable row becomes `Option<(uuid::Uuid, Secret<String>)>`
+    // At this point, row is an `Option<Row>`. After this, row becomes `Option<(uuid::Uuid, Secret<String>)>`
     .map(|row| (row.id, Secret::new(row.password_hash)));
     Ok(row)
 }
 
-#[tracing::instrument(name = "Change password", skip(password, pool))]
+#[tracing::instrument(skip(password, pool))]
 pub async fn change_password(
     user_id: uuid::Uuid,
     password: Secret<String>,
@@ -117,6 +115,7 @@ pub async fn change_password(
     .context("Failed to change user's password in the database.")?;
     Ok(())
 }
+
 pub fn compute_password_hash(password: Secret<String>) -> Result<Secret<String>, anyhow::Error> {
     let salt = SaltString::generate(&mut rand::thread_rng());
     let password_hash = Argon2::new(

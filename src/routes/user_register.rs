@@ -73,7 +73,6 @@ impl TryFrom<UserData> for NewUser {
     }
 }
 #[tracing::instrument(
-    name = "Add a new user",
     skip_all,
     fields(
         user_email = %payload.email,
@@ -124,7 +123,10 @@ pub async fn register_user(
     Ok(HttpResponse::Ok().json(success))
 }
 
-#[tracing::instrument(name = "Save new user details in the database", skip_all)]
+#[tracing::instrument(
+    skip_all,
+    fields(user_name = %user_name)
+)]
 pub async fn insert_user(
     user_name: &UserName,
     email: &UserEmail,
@@ -155,7 +157,7 @@ pub async fn insert_user(
     Ok(user_id)
 }
 
-#[tracing::instrument(name = "Store token in the database", skip(token, transaction))]
+#[tracing::instrument(skip(token, transaction))]
 pub async fn store_activation_token(
     transaction: &mut Transaction<'_, Postgres>,
     user_id: Uuid,
@@ -176,7 +178,10 @@ pub async fn store_activation_token(
     Ok(())
 }
 
-#[tracing::instrument(name = "Send a confirmation email to new user", skip_all)]
+#[tracing::instrument(
+    skip_all,
+    fields(user_email = %user_email)
+)]
 pub async fn send_confirmation_email(
     email_client: &EmailClient,
     user_email: UserEmail,
@@ -225,8 +230,10 @@ impl ResponseError for UserActivationError {
     }
 }
 
-#[tracing::instrument(name = "Confirm a pending user activation", skip(parameters, pool))]
-
+#[tracing::instrument(
+    skip_all,
+    fields(user_id=tracing::field::Empty)
+)]
 pub async fn confirm_user_activation(
     parameters: web::Query<ActivationParameters>,
     pool: web::Data<PgPool>,
@@ -235,16 +242,13 @@ pub async fn confirm_user_activation(
         .await?
         // Domain error (invalid token), so a new `UserConfirmError::UnknownToken` error is created as there's no existing error to wrap in an `anyhow::Error`
         .ok_or(UserActivationError::UnknownToken)?;
+    tracing::Span::current().record("user_id", tracing::field::display(user_id));
 
     activate_user_and_delete_token(&pool, user_id, &parameters.token).await?;
-
     Ok(HttpResponse::Ok().finish())
 }
 
-#[tracing::instrument(
-    name = "Mark user as activated and delete token",
-    skip(user_id, pool, token)
-)]
+#[tracing::instrument(skip(pool, token))]
 pub async fn activate_user_and_delete_token(
     pool: &PgPool,
     user_id: Uuid,
@@ -270,7 +274,6 @@ pub async fn activate_user_and_delete_token(
     Ok(())
 }
 
-#[tracing::instrument(name = "Get user_id from token", skip(token, pool))]
 pub async fn get_user_id_from_token(
     pool: &PgPool,
     token: &str,

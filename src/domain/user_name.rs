@@ -31,6 +31,12 @@ impl AsRef<str> for UserName {
     }
 }
 
+impl std::fmt::Display for UserName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::domain::UserName;

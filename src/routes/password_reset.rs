@@ -62,6 +62,10 @@ impl TryFrom<PasswordResetData> for (UserPassword, UserPassword) {
     }
 }
 
+#[tracing::instrument(
+    skip_all,
+    fields(user_id=%&*user_id)
+)]
 pub async fn change_password(
     payload: web::Json<PasswordResetData>,
     pool: web::Data<PgPool>,
@@ -96,7 +100,6 @@ pub async fn change_password(
     Ok(HttpResponse::Ok().json(success))
 }
 
-#[tracing::instrument(name = "Get username", skip(pool))]
 pub async fn get_username(user_id: Uuid, pool: &PgPool) -> Result<String, anyhow::Error> {
     let row = sqlx::query!(
         r#"

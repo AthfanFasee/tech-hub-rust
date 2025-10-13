@@ -45,7 +45,10 @@ impl ResponseError for UserSubscribeError {
     }
 }
 
-#[tracing::instrument(name = "Confirm a pending user subscription", skip(parameters, pool))]
+#[tracing::instrument(
+    skip_all,
+    fields(user_id=tracing::field::Empty)
+)]
 pub async fn subscribe_user(
     parameters: web::Query<SubscribeParameters>,
     pool: web::Data<PgPool>,
@@ -54,16 +57,13 @@ pub async fn subscribe_user(
         .await?
         // Domain error (invalid token), so a new `UserConfirmError::UnknownToken` error is created instead of wrapping an `anyhow::Error`
         .ok_or(UserSubscribeError::UnknownToken)?;
+    tracing::Span::current().record("user_id", tracing::field::display(user_id));
 
     subscribe_user_and_delete_token(&pool, user_id, &parameters.token).await?;
-
     Ok(HttpResponse::Ok().finish())
 }
 
-#[tracing::instrument(
-    name = "Mark user as subscribed and delete token",
-    skip(user_id, pool, token)
-)]
+#[tracing::instrument(skip(pool, token))]
 pub async fn subscribe_user_and_delete_token(
     pool: &PgPool,
     user_id: Uuid,
@@ -90,8 +90,8 @@ pub async fn subscribe_user_and_delete_token(
 }
 
 #[tracing::instrument(
-    name = "Confirm a pending user subscription",
-    skip(email_client, pool, base_url)
+    skip_all,
+    fields(user_id=%&*user_id)
 )]
 pub async fn send_subscribe_email(
     email_client: web::Data<EmailClient>,
@@ -114,7 +114,10 @@ pub async fn send_subscribe_email(
     Ok(HttpResponse::Ok().finish())
 }
 
-#[tracing::instrument(name = "Send a subscription email", skip_all)]
+#[tracing::instrument(
+    skip_all,
+    fields(user_email = %user_email)
+)]
 pub async fn send_subscription_email(
     email_client: &EmailClient,
     user_email: UserEmail,
@@ -134,7 +137,6 @@ pub async fn send_subscription_email(
         .await
 }
 
-#[tracing::instrument(name = "Get user email", skip(pool))]
 pub async fn get_user_email(user_id: Uuid, pool: &PgPool) -> Result<String, anyhow::Error> {
     let row = sqlx::query!(
         r#"
@@ -150,7 +152,7 @@ pub async fn get_user_email(user_id: Uuid, pool: &PgPool) -> Result<String, anyh
     Ok(row.email)
 }
 
-#[tracing::instrument(name = "Store subscription token in the database", skip(token, pool))]
+#[tracing::instrument(skip(token, pool))]
 pub async fn store_subscription_token(
     pool: &PgPool,
     user_id: Uuid,
