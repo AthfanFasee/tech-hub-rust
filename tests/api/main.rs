@@ -4,5 +4,6 @@ mod idempotency;
 mod login;
 mod news_letter;
 mod password_reset;
+mod post;
 mod user_register;
 mod user_subscribe;
