@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM newsletter_issues\n        WHERE created_at < NOW() - INTERVAL '7 days'\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "a34dbb3ed1615e275c8ca67f2ef32a474f4703f75d86aa9430821b007c662746"
+}

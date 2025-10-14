@@ -6,11 +6,11 @@ async fn old_idempotency_records_are_cleaned_up() {
     let app = spawn_app().await;
     let pool = &app.db_pool;
 
-    // Insert one old record (older than 24h)
+    // Insert one old record (older than 48h)
     sqlx::query!(
         r#"
         INSERT INTO idempotency (user_id, idempotency_key, created_at)
-        VALUES ($1, $2, NOW() - INTERVAL '25 hours')
+        VALUES ($1, $2, NOW() - INTERVAL '50 hours')
         "#,
         app.test_user.user_id,
         "old-key"

@@ -7,7 +7,7 @@ use rand::{Rng, SeedableRng};
 use sqlx::{Executor, PgPool, Postgres, Transaction};
 use std::ops::DerefMut;
 use tokio::time::Duration;
-use tracing::{field::display, Span};
+use tracing::{Span, field::display};
 use uuid::Uuid;
 
 pub enum ExecutionOutcome {
@@ -119,12 +119,12 @@ pub async fn try_execute_task(
             if let Err(rb_err) = transaction.rollback().await {
                 // If rollback failed combine both errors into one anyhow error
                 let combined_error = anyhow::anyhow!(
-                "Task failed and rollback also failed.\n\
+                    "Task failed and rollback also failed.\n\
                 Task error: {:#}\n\
                 Rollback error: {:#}",
-                e,
-                rb_err
-            );
+                    e,
+                    rb_err
+                );
                 return Err(combined_error.context("Critical failure during newsletter delivery"));
             }
 
@@ -132,7 +132,6 @@ pub async fn try_execute_task(
             return Err(e.context("Task failed while processing newsletter delivery"));
         }
     }
-
 
     Ok(ExecutionOutcome::TaskCompleted)
 }
@@ -210,9 +209,9 @@ async fn dequeue_task(
         LIMIT 1
         "#
     )
-        .fetch_optional(transaction.deref_mut())
-        .await
-        .context("Failed dequeue a newsletter issue task from db")?;
+    .fetch_optional(transaction.deref_mut())
+    .await
+    .context("Failed dequeue a newsletter issue task from db")?;
 
     if let Some(r) = r {
         Ok(Some((
@@ -315,15 +314,16 @@ async fn get_newsletter_issue(
         "#,
         issue_id
     )
-        .fetch_one(&mut **transaction)
-        .await
-        .context("Failed to get newsletter issue details")?;
+    .fetch_one(&mut **transaction)
+    .await
+    .context("Failed to get newsletter issue details")?;
 
     Ok(issue)
 }
 
 pub async fn cleanup_old_idempotency_records(pool: &PgPool) -> Result<(), anyhow::Error> {
-    let deleted = sqlx::query!(r#"DELETE FROM idempotency WHERE created_at < NOW() - INTERVAL '48 hours'"#)
+    let deleted =
+        sqlx::query!(r#"DELETE FROM idempotency WHERE created_at < NOW() - INTERVAL '48 hours'"#)
             .execute(pool)
             .await?
             .rows_affected();
@@ -332,6 +332,7 @@ pub async fn cleanup_old_idempotency_records(pool: &PgPool) -> Result<(), anyhow
     Ok(())
 }
 
+// Moving to an archive table rather than deleting would be preferable if you want to record keep
 #[tracing::instrument(skip(pool))]
 pub async fn cleanup_old_newsletter_issues(pool: &PgPool) -> Result<(), anyhow::Error> {
     let deleted = sqlx::query!(
@@ -340,9 +341,9 @@ pub async fn cleanup_old_newsletter_issues(pool: &PgPool) -> Result<(), anyhow::
         WHERE created_at < NOW() - INTERVAL '7 days'
         "#,
     )
-        .execute(pool)
-        .await?
-        .rows_affected();
+    .execute(pool)
+    .await?
+    .rows_affected();
 
     tracing::info!(deleted, "Old newsletter issues cleanup completed");
     Ok(())

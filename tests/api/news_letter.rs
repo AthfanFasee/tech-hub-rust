@@ -1,4 +1,4 @@
-use crate::helpers::{spawn_app, ConfirmationLinks, TestApp, TestUser};
+use crate::helpers::{ConfirmationLinks, TestApp, TestUser, spawn_app};
 use std::time::Duration;
 use techhub::newsletter_delivery_worker::cleanup_old_newsletter_issues;
 use uuid::Uuid;
@@ -256,9 +256,9 @@ async fn failed_newsletter_delivery_is_retried_with_back_off() {
         FROM issue_delivery_queue
         "#,
     )
-        .fetch_all(&app.db_pool)
-        .await
-        .expect("Expected to query issue_delivery_queue");
+    .fetch_all(&app.db_pool)
+    .await
+    .expect("Expected to query issue_delivery_queue");
 
     assert_eq!(tasks.len(), 1, "Expected exactly one delivery task");
     let task = &tasks[0];
@@ -275,9 +275,9 @@ async fn failed_newsletter_delivery_is_retried_with_back_off() {
         task.newsletter_issue_id,
         task.user_email
     )
-        .fetch_one(&app.db_pool)
-        .await
-        .expect("Expected task to still exist after retry");
+    .fetch_one(&app.db_pool)
+    .await
+    .expect("Expected task to still exist after retry");
 
     assert_eq!(record.n_retries, 1, "Retry count should increment");
     assert!(
@@ -285,7 +285,6 @@ async fn failed_newsletter_delivery_is_retried_with_back_off() {
         "execute_after should be in the future"
     );
 }
-
 
 #[tokio::test]
 async fn old_newsletter_issues_are_cleaned_up() {
@@ -303,9 +302,9 @@ async fn old_newsletter_issues_are_cleaned_up() {
         "Old text content",
         "<p>Old HTML content</p>",
     )
-        .execute(pool)
-        .await
-        .unwrap();
+    .execute(pool)
+    .await
+    .unwrap();
 
     // Insert a recent newsletter issue (newer than 7 days)
     let new_id = Uuid::new_v4();
@@ -319,9 +318,9 @@ async fn old_newsletter_issues_are_cleaned_up() {
         "Recent text content",
         "<p>Recent HTML content</p>",
     )
-        .execute(pool)
-        .await
-        .unwrap();
+    .execute(pool)
+    .await
+    .unwrap();
 
     cleanup_old_newsletter_issues(pool).await.unwrap();
 
@@ -330,30 +329,23 @@ async fn old_newsletter_issues_are_cleaned_up() {
         r#"SELECT EXISTS(SELECT 1 FROM newsletter_issues WHERE title = $1)"#,
         "Old newsletter"
     )
-        .fetch_one(pool)
-        .await
-        .unwrap()
-        .unwrap();
-    assert!(
-        !old_exists,
-        "Old newsletter issue was not deleted"
-    );
+    .fetch_one(pool)
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(!old_exists, "Old newsletter issue was not deleted");
 
     // Recent newsletter should still exist
     let new_exists = sqlx::query_scalar!(
         r#"SELECT EXISTS(SELECT 1 FROM newsletter_issues WHERE id = $1)"#,
         new_id
     )
-        .fetch_one(pool)
-        .await
-        .unwrap()
-        .unwrap();
-    assert!(
-        new_exists,
-        "Recent newsletter issue was wrongly deleted"
-    );
+    .fetch_one(pool)
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(new_exists, "Recent newsletter issue was wrongly deleted");
 }
-
 
 async fn create_inactivated_user(app: &TestApp) -> (serde_json::Value, ConfirmationLinks) {
     let user = TestUser::generate();

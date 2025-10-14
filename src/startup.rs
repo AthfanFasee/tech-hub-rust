@@ -1,6 +1,6 @@
 use crate::configuration::{Configuration, DatabaseConfigs};
 use crate::email_client::EmailClient;
-use crate::routes::{admin_routes, health_check, user_routes};
+use crate::routes::{admin_routes, health_check, post_routes, user_routes};
 use actix_session::SessionMiddleware;
 use actix_session::storage::RedisSessionStore;
 use actix_web::dev::Server;
@@ -106,6 +106,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
         .service(
             web::scope("/v1")
                 .service(web::scope("/user").configure(user_routes))
-                .service(web::scope("/admin").configure(admin_routes)),
+                .service(web::scope("/admin").configure(admin_routes))
+                .service(web::scope("/post").configure(post_routes)),
         );
 }
