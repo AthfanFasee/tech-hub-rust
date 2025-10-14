@@ -7,7 +7,7 @@ use rand::{Rng, SeedableRng};
 use sqlx::{Executor, PgPool, Postgres, Transaction};
 use std::ops::DerefMut;
 use tokio::time::Duration;
-use tracing::{Span, field::display};
+use tracing::{field::display, Span};
 use uuid::Uuid;
 
 pub enum ExecutionOutcome {
@@ -22,23 +22,24 @@ pub async fn run_worker_until_stopped(config: Configuration) -> Result<(), anyho
 }
 
 async fn worker_loop(pool: PgPool, email_client: EmailClient) -> Result<(), anyhow::Error> {
-    // spawn idempotency data cleanup loop independently
+    // spawn cleanup loops independently
     let pool_for_cleanup = pool.clone();
+
     tokio::spawn(async move {
         let mut rng = StdRng::from_entropy();
+
         loop {
             if let Err(e) = cleanup_old_idempotency_records(&pool_for_cleanup).await {
-                tracing::error!(
-                    error.cause_chain = ?e,
-                    error.message = %e,
-                    "Idempotency cleanup failed"
-                );
+                tracing::error!(error.cause_chain = ?e, "Idempotency cleanup failed");
+            }
+            if let Err(e) = cleanup_old_newsletter_issues(&pool_for_cleanup).await {
+                tracing::error!(error.cause_chain = ?e, "Old newsletter cleanup failed");
             }
 
             // This random jitter will ensure multiple instances of app won't clean db at same time
             // Nonetheless a delete statement is concurrency safe in db
             let jitter = rng.gen_range(0..=3600);
-            tokio::time::sleep(Duration::from_secs(12 * 3600 + jitter)).await;
+            tokio::time::sleep(Duration::from_secs(24 * 3600 + jitter)).await;
         }
     });
 
@@ -72,8 +73,8 @@ async fn worker_loop(pool: PgPool, email_client: EmailClient) -> Result<(), anyh
                 let sleep_duration = Duration::from_secs_f64(backoff_secs as f64 * (1.0 + jitter));
                 tokio::time::sleep(sleep_duration).await;
 
-                // exponential backoff, capped at 60s
-                backoff_secs = (backoff_secs * 2).min(60);
+                // exponential backoff, capped at 120s
+                backoff_secs = (backoff_secs * 2).min(120);
             }
         }
     }
@@ -106,7 +107,6 @@ pub async fn try_execute_task(
     let result =
         process_delivery_task(&mut transaction, issue_id, &email, n_retries, email_client).await;
 
-    // Finalize transaction
     match result {
         Ok(_) => {
             transaction
@@ -115,13 +115,24 @@ pub async fn try_execute_task(
                 .context("Failed to commit transaction after processing newsletter issue")?;
         }
         Err(e) => {
-            tracing::error!(error = ?e, "Task failed, rolling back transaction");
-            transaction
-                .rollback()
-                .await
-                .context("Failed to rollback transaction after newsletter delivery failure")?;
+            // Try rollback
+            if let Err(rb_err) = transaction.rollback().await {
+                // If rollback failed combine both errors into one anyhow error
+                let combined_error = anyhow::anyhow!(
+                "Task failed and rollback also failed.\n\
+                Task error: {:#}\n\
+                Rollback error: {:#}",
+                e,
+                rb_err
+            );
+                return Err(combined_error.context("Critical failure during newsletter delivery"));
+            }
+
+            // Rollback succeeded, return only the task error
+            return Err(e.context("Task failed while processing newsletter delivery"));
         }
     }
+
 
     Ok(ExecutionOutcome::TaskCompleted)
 }
@@ -199,9 +210,9 @@ async fn dequeue_task(
         LIMIT 1
         "#
     )
-    .fetch_optional(transaction.deref_mut())
-    .await
-    .context("Failed dequeue a newsletter issue task from db")?;
+        .fetch_optional(transaction.deref_mut())
+        .await
+        .context("Failed dequeue a newsletter issue task from db")?;
 
     if let Some(r) = r {
         Ok(Some((
@@ -304,20 +315,35 @@ async fn get_newsletter_issue(
         "#,
         issue_id
     )
-    .fetch_one(&mut **transaction)
-    .await
-    .context("Failed to get newsletter issue details")?;
+        .fetch_one(&mut **transaction)
+        .await
+        .context("Failed to get newsletter issue details")?;
 
     Ok(issue)
 }
 
 pub async fn cleanup_old_idempotency_records(pool: &PgPool) -> Result<(), anyhow::Error> {
-    let deleted =
-        sqlx::query!(r#"DELETE FROM idempotency WHERE created_at < NOW() - INTERVAL '24 hours'"#)
+    let deleted = sqlx::query!(r#"DELETE FROM idempotency WHERE created_at < NOW() - INTERVAL '48 hours'"#)
             .execute(pool)
             .await?
             .rows_affected();
 
     tracing::info!(deleted, "Idempotency cleanup completed");
+    Ok(())
+}
+
+#[tracing::instrument(skip(pool))]
+pub async fn cleanup_old_newsletter_issues(pool: &PgPool) -> Result<(), anyhow::Error> {
+    let deleted = sqlx::query!(
+        r#"
+        DELETE FROM newsletter_issues
+        WHERE created_at < NOW() - INTERVAL '7 days'
+        "#,
+    )
+        .execute(pool)
+        .await?
+        .rows_affected();
+
+    tracing::info!(deleted, "Old newsletter issues cleanup completed");
     Ok(())
 }
