@@ -41,7 +41,7 @@
       {
         "ordinal": 7,
         "name": "liked_by",
-        "type_info": "Int4Array"
+        "type_info": "UuidArray"
       }
     ],
     "parameters": {
@@ -57,7 +57,7 @@
       false,
       false,
       false,
-      true
+      false
     ]
   },
   "hash": "1cd1a1af9979a68bd23f9213d644dc00c3f7ed1944a5e62fb3f91133cca98d65"

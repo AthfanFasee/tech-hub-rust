@@ -77,6 +77,7 @@ pub async fn log_out(session: TypedSession) -> Result<HttpResponse, LoginError> 
     Ok(HttpResponse::Ok().finish())
 }
 
+#[tracing::instrument()]
 pub async fn protected_endpoint() -> Result<HttpResponse, LoginError> {
     Ok(HttpResponse::Ok().finish())
 }

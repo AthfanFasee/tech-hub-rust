@@ -57,7 +57,15 @@ impl TestApp {
             .expect("POST request with headers failed")
     }
 
-    pub async fn send_patch(&self, endpoint: &str, payload: &Value) -> Response {
+    pub async fn send_patch(&self, endpoint: &str) -> Response {
+        self.api_client
+            .patch(format!("{}/{}", &self.address, endpoint))
+            .send()
+            .await
+            .expect("Failed to execute PATCH request.")
+    }
+
+    pub async fn send_patch_with_payload(&self, endpoint: &str, payload: &Value) -> Response {
         self.api_client
             .patch(format!("{}/{}", &self.address, endpoint))
             .json(payload)

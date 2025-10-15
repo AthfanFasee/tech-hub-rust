@@ -1,4 +1,5 @@
 mod admin;
+mod comment;
 mod http;
 mod post;
 mod user;

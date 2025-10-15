@@ -11,15 +11,20 @@
       <w>gjtm</w>
       <w>guin</w>
       <w>isready</w>
+      <w>likescount</w>
       <w>moodfeed</w>
       <w>orkoo</w>
+      <w>plainto</w>
       <w>pqkdu</w>
       <w>qgdf</w>
       <w>rdlhr</w>
+      <w>readtime</w>
       <w>rjft</w>
       <w>rustls</w>
       <w>techhub</w>
       <w>tnmw</w>
+      <w>tsquery</w>
+      <w>tsvector</w>
       <w>zgiwai</w>
     </words>
   </dictionary>

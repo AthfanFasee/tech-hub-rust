@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE posts\n        SET liked_by = (\n            SELECT array_agg(DISTINCT x)\n            FROM unnest(array_append(liked_by, $1)) t(x)\n        )\n        WHERE id = $2 AND deleted_at IS NULL\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6492346a1fd87d9c69a5329744e5eb867727e0364fa605fb0a6cf44bf2e954f0"
+}

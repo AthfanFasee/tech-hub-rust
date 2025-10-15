@@ -1,6 +1,7 @@
 use crate::helpers::{TestApp, spawn_app};
 use serde_json::json;
 use sqlx::query;
+use uuid::Uuid;
 
 #[tokio::test]
 async fn user_must_be_logged_in_to_create_post() {
@@ -301,7 +302,7 @@ async fn hard_delete_post_removes_from_database() {
 #[tokio::test]
 async fn hard_delete_requires_admin_privileges() {
     let app = spawn_app().await;
-    app.login().await; // Normal user
+    app.login().await;
 
     let post_id = create_sample_post(&app).await;
 
@@ -335,7 +336,235 @@ async fn hard_delete_returns_404_for_nonexistent_post() {
     );
 }
 
-async fn create_sample_post(app: &TestApp) -> uuid::Uuid {
+#[tokio::test]
+async fn like_post_adds_user_to_liked_by() {
+    let app = spawn_app().await;
+    app.login().await;
+
+    let post_id = create_sample_post(&app).await;
+    let user_id = app.test_user.user_id;
+
+    let response = app.like_post(&post_id).await;
+    assert_eq!(response.status().as_u16(), 200, "Like request failed");
+
+    let record = query!(
+        r#"
+        SELECT liked_by
+        FROM posts
+        WHERE id = $1
+        "#,
+        post_id
+    )
+    .fetch_one(&app.db_pool)
+    .await
+    .expect("Failed to fetch post after like");
+
+    assert!(
+        record.liked_by.contains(&user_id),
+        "Expected liked_by to contain user_id after liking post"
+    );
+}
+
+#[tokio::test]
+async fn like_post_is_idempotent_for_same_user() {
+    let app = spawn_app().await;
+    app.login().await;
+
+    let post_id = create_sample_post(&app).await;
+    let user_id = app.test_user.user_id;
+
+    // Like twice
+    app.like_post(&post_id).await;
+    app.like_post(&post_id).await;
+
+    let record = query!(
+        r#"
+        SELECT liked_by
+        FROM posts
+        WHERE id = $1
+        "#,
+        post_id
+    )
+    .fetch_one(&app.db_pool)
+    .await
+    .expect("Failed to fetch post after like");
+
+    let count = record.liked_by.iter().filter(|&&id| id == user_id).count();
+
+    assert_eq!(count, 1, "Expected exactly one like from this user");
+}
+
+#[tokio::test]
+async fn like_post_returns_404_for_nonexistent_post() {
+    let app = spawn_app().await;
+    app.login().await;
+
+    let random_id = Uuid::new_v4();
+    let response = app.like_post(&random_id).await;
+
+    assert_eq!(
+        response.status().as_u16(),
+        404,
+        "Expected 404 for liking non-existing post"
+    );
+}
+
+#[tokio::test]
+async fn like_post_returns_401_if_unauthenticated() {
+    let app = spawn_app().await;
+    app.login().await;
+
+    let post_id = create_sample_post(&app).await;
+    app.logout().await;
+
+    let response = app.like_post(&post_id).await;
+    assert_eq!(
+        response.status().as_u16(),
+        401,
+        "Expected 401 for unauthenticated like request"
+    );
+}
+
+#[tokio::test]
+async fn dislike_post_removes_user_from_liked_by() {
+    let app = spawn_app().await;
+    app.login().await;
+
+    let post_id = create_sample_post(&app).await;
+    let user_id = app.test_user.user_id;
+
+    app.like_post(&post_id).await;
+
+    let response = app.dislike_post(&post_id).await;
+    assert_eq!(response.status().as_u16(), 200, "Dislike request failed");
+
+    let record = query!(
+        r#"
+        SELECT liked_by
+        FROM posts
+        WHERE id = $1
+        "#,
+        post_id
+    )
+    .fetch_one(&app.db_pool)
+    .await
+    .expect("Failed to fetch post after dislike");
+
+    assert!(
+        !record.liked_by.contains(&user_id),
+        "Expected liked_by to not contain user_id after dislike"
+    );
+}
+
+#[tokio::test]
+async fn dislike_post_returns_404_for_nonexistent_post() {
+    let app = spawn_app().await;
+    app.login().await;
+
+    let random_id = Uuid::new_v4();
+    let response = app.dislike_post(&random_id).await;
+
+    assert_eq!(
+        response.status().as_u16(),
+        404,
+        "Expected 404 for disliking non-existing post"
+    );
+}
+
+#[tokio::test]
+async fn dislike_post_returns_401_if_unauthenticated() {
+    let app = spawn_app().await;
+    app.login().await;
+
+    let post_id = create_sample_post(&app).await;
+    app.logout().await;
+
+    let response = app.dislike_post(&post_id).await;
+    assert_eq!(
+        response.status().as_u16(),
+        401,
+        "Expected 401 for unauthenticated dislike request"
+    );
+}
+
+#[tokio::test]
+async fn get_post_returns_post_data_successfully() {
+    let app = spawn_app().await;
+    app.login().await;
+
+    let post_id = create_sample_post(&app).await;
+    let response = app.get_post(&post_id).await;
+    assert_eq!(
+        response.status().as_u16(),
+        200,
+        "Expected 200 OK when fetching an existing post"
+    );
+
+    let body: serde_json::Value = response.json().await.unwrap();
+    assert_eq!(body["post"]["id"], post_id.to_string());
+    assert!(body["post"]["title"].is_string());
+}
+
+#[tokio::test]
+async fn get_post_returns_404_for_nonexistent_post() {
+    let app = spawn_app().await;
+    app.login().await;
+
+    let random_id = Uuid::new_v4();
+    let response = app.get_post(&random_id).await;
+    assert_eq!(
+        response.status().as_u16(),
+        404,
+        "Expected 404 for non-existing post"
+    );
+}
+
+#[tokio::test]
+async fn get_post_does_return_200_if_unauthenticated() {
+    let app = spawn_app().await;
+    app.login().await;
+
+    let post_id = create_sample_post(&app).await;
+    app.logout().await;
+
+    let response = app.get_post(&post_id).await;
+    assert_eq!(
+        response.status().as_u16(),
+        200,
+        "Expected 200 OK when fetching an existing post as unauthenticated user"
+    );
+}
+
+#[tokio::test]
+async fn get_post_does_not_return_deleted_posts() {
+    let app = spawn_app().await;
+    app.login().await;
+
+    let post_id = create_sample_post(&app).await;
+
+    // Soft delete manually
+    query!(
+        r#"
+        UPDATE posts
+        SET deleted_at = now()
+        WHERE id = $1
+        "#,
+        post_id
+    )
+    .execute(&app.db_pool)
+    .await
+    .expect("Failed to soft delete post");
+
+    let response = app.get_post(&post_id).await;
+
+    assert_eq!(
+        response.status().as_u16(),
+        404,
+        "Expected 404 for soft-deleted post"
+    );
+}
+
+async fn create_sample_post(app: &TestApp) -> Uuid {
     let payload = json!({
         "title": "Initial title",
         "text": "Initial text",
@@ -349,5 +578,5 @@ async fn create_sample_post(app: &TestApp) -> uuid::Uuid {
         "Failed to create sample post"
     );
     let body: serde_json::Value = response.json().await.unwrap();
-    uuid::Uuid::parse_str(body["id"].as_str().unwrap()).unwrap()
+    Uuid::parse_str(body["id"].as_str().unwrap()).unwrap()
 }
