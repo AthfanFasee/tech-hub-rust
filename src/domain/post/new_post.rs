@@ -21,7 +21,7 @@ impl Post {
 
 #[cfg(test)]
 mod tests {
-    use crate::domain::post::post::Post;
+    use crate::domain::post::new_post::Post;
 
     #[test]
     fn empty_title_is_rejected() {

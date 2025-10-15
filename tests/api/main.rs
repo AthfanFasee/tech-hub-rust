@@ -1,3 +1,5 @@
+mod comment;
+mod get_all_posts;
 mod health_check;
 mod helpers;
 mod idempotency;
