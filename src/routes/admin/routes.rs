@@ -8,6 +8,6 @@ pub fn admin_routes(cfg: &mut web::ServiceConfig) {
         web::scope("/me")
             .wrap(from_fn(reject_non_admin_users))
             .route("/newsletters/publish", web::post().to(publish_newsletter))
-            .route("/post/delete/{id}", web::delete().to(hard_delete_post)),
+            .route("/posts/delete/{id}", web::delete().to(hard_delete_post)),
     );
 }

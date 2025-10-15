@@ -14,6 +14,6 @@ impl TestApp {
     }
 
     pub async fn get_comments(&self, id: &Uuid) -> Response {
-        self.send_get(&format!("v1/comment/get/post/{id}")).await
+        self.send_get(&format!("v1/comment/get/posts/{id}")).await
     }
 }

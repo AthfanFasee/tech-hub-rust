@@ -40,7 +40,7 @@ mod tests {
     fn valid_post_is_accepted() {
         let result = Post::new(
             "A Valid Title".into(),
-            "This is the post body.".into(),
+            "This is the posts body.".into(),
             "img.png".into(),
         );
         assert!(result.is_ok());
