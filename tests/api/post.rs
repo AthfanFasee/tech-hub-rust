@@ -50,8 +50,8 @@ async fn create_post_persists_valid_post_and_returns_201() {
     app.login().await;
 
     let payload = json!({
-        "title": "My first blog post",
-        "text": "This is a test post",
+        "title": "My first blog posts",
+        "text": "This is a test posts",
         "img": "https://example.com/img.jpg"
     });
 
@@ -60,8 +60,8 @@ async fn create_post_persists_valid_post_and_returns_201() {
 
     let body: serde_json::Value = response.json().await.unwrap();
 
-    assert_eq!(body["title"], "My first blog post");
-    assert_eq!(body["post_text"], "This is a test post");
+    assert_eq!(body["title"], "My first blog posts");
+    assert_eq!(body["post_text"], "This is a test posts");
     assert_eq!(body["img"], "https://example.com/img.jpg");
     assert!(body.get("id").is_some(), "Missing 'id' field in response");
     assert!(
@@ -81,14 +81,14 @@ async fn create_post_persists_valid_post_and_returns_201() {
         FROM posts
         WHERE title = $1
         "#,
-        "My first blog post"
+        "My first blog posts"
     )
     .fetch_one(&app.db_pool)
     .await
-    .expect("Failed to fetch saved post.");
+    .expect("Failed to fetch saved posts.");
 
-    assert_eq!(saved.title, "My first blog post");
-    assert_eq!(saved.post_text, "This is a test post");
+    assert_eq!(saved.title, "My first blog posts");
+    assert_eq!(saved.post_text, "This is a test posts");
     assert_eq!(saved.img, "https://example.com/img.jpg");
 
     assert_eq!(
@@ -171,7 +171,7 @@ async fn update_post_persists_changes_and_returns_200() {
 
     let payload = json!({
         "title": "Updated Title",
-        "text": "Updated post content",
+        "text": "Updated posts content",
         "img": "https://example.com/updated.jpg"
     });
 
@@ -179,10 +179,10 @@ async fn update_post_persists_changes_and_returns_200() {
     assert_eq!(response.status().as_u16(), 200, "Update failed");
 
     let body: serde_json::Value = response.json().await.unwrap();
-    let post = &body["post"];
+    let post = &body["posts"];
 
     assert_eq!(post["title"], "Updated Title");
-    assert_eq!(post["text"], "Updated post content");
+    assert_eq!(post["text"], "Updated posts content");
     assert_eq!(post["img"], "https://example.com/updated.jpg");
 
     let record = query!(
@@ -195,10 +195,10 @@ async fn update_post_persists_changes_and_returns_200() {
     )
     .fetch_one(&app.db_pool)
     .await
-    .expect("Failed to fetch updated post");
+    .expect("Failed to fetch updated posts");
 
     assert_eq!(record.title, "Updated Title");
-    assert_eq!(record.post_text, "Updated post content");
+    assert_eq!(record.post_text, "Updated posts content");
     assert_eq!(record.img, "https://example.com/updated.jpg");
     assert!(record.version > 1, "Version should have been incremented");
 }
@@ -220,7 +220,7 @@ async fn delete_post_marks_post_as_deleted() {
     let record = query!("SELECT deleted_at FROM posts WHERE id = $1", post_id)
         .fetch_one(&app.db_pool)
         .await
-        .expect("Failed to fetch deleted post");
+        .expect("Failed to fetch deleted posts");
 
     assert!(
         record.deleted_at.is_some(),
@@ -291,7 +291,7 @@ async fn hard_delete_post_removes_from_database() {
     let result = query!("SELECT id FROM posts WHERE id = $1", post_id)
         .fetch_optional(&app.db_pool)
         .await
-        .expect("Failed to query post after hard delete");
+        .expect("Failed to query posts after hard delete");
 
     assert!(
         result.is_none(),
@@ -357,7 +357,7 @@ async fn like_post_adds_user_to_liked_by() {
     )
     .fetch_one(&app.db_pool)
     .await
-    .expect("Failed to fetch post after like");
+    .expect("Failed to fetch posts after like");
 
     assert!(
         record.liked_by.contains(&user_id),
@@ -387,7 +387,7 @@ async fn like_post_is_idempotent_for_same_user() {
     )
     .fetch_one(&app.db_pool)
     .await
-    .expect("Failed to fetch post after like");
+    .expect("Failed to fetch posts after like");
 
     let count = record.liked_by.iter().filter(|&&id| id == user_id).count();
 
@@ -448,7 +448,7 @@ async fn dislike_post_removes_user_from_liked_by() {
     )
     .fetch_one(&app.db_pool)
     .await
-    .expect("Failed to fetch post after dislike");
+    .expect("Failed to fetch posts after dislike");
 
     assert!(
         !record.liked_by.contains(&user_id),
@@ -501,8 +501,8 @@ async fn get_post_returns_post_data_successfully() {
     );
 
     let body: serde_json::Value = response.json().await.unwrap();
-    assert_eq!(body["post"]["id"], post_id.to_string());
-    assert!(body["post"]["title"].is_string());
+    assert_eq!(body["posts"]["id"], post_id.to_string());
+    assert!(body["posts"]["title"].is_string());
 }
 
 #[tokio::test]
@@ -553,7 +553,7 @@ async fn get_post_does_not_return_deleted_posts() {
     )
     .execute(&app.db_pool)
     .await
-    .expect("Failed to soft delete post");
+    .expect("Failed to soft delete posts");
 
     let response = app.get_post(&post_id).await;
 

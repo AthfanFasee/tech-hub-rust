@@ -33,7 +33,7 @@ async fn create_comment_returns_400_for_invalid_post_id() {
     app.login().await;
 
     let payload = json!({
-        "text": "Invalid post id test",
+        "text": "Invalid posts id test",
         "post_id": "not-a-uuid"
     });
 
@@ -213,8 +213,8 @@ async fn delete_comment_returns_401_if_unauthenticated() {
 async fn create_sample_post(app: &TestApp) -> Uuid {
     let payload = json!({
         "title": "Post for comments",
-        "text": "This is a sample post to attach comments to",
-        "img": "https://example.com/post.jpg"
+        "text": "This is a sample posts to attach comments to",
+        "img": "https://example.com/posts.jpg"
     });
 
     let response = app.create_post(&payload).await;

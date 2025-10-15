@@ -18,10 +18,10 @@ pub enum PostError {
     #[error("{0}")]
     ValidationError(String),
 
-    #[error("post not found")]
+    #[error("posts not found")]
     NotFound,
 
-    #[error("edit conflict: post was modified by another request")]
+    #[error("edit conflict: posts was modified by another request")]
     EditConflict,
 
     #[error(transparent)]
@@ -47,16 +47,7 @@ impl ResponseError for PostError {
     }
 }
 
-#[tracing::instrument(
-    skip(pool, query),
-    fields(
-        title = %query.title,
-        page = %query.page,
-        limit = %query.limit,
-        sort = %query.sort,
-        id = %query.id
-    )
-)]
+#[tracing::instrument(skip(pool))]
 pub async fn get_all_posts(
     query: web::Query<GetAllPostsQuery>,
     pool: web::Data<PgPool>,
@@ -168,10 +159,6 @@ pub struct PostPathParams {
     pub id: Uuid,
 }
 
-#[tracing::instrument(
-    skip_all,
-    fields(post_id = %path.id)
-)]
 pub async fn get_post(
     path: web::Path<PostPathParams>,
     pool: web::Data<PgPool>,
@@ -180,7 +167,26 @@ pub async fn get_post(
 
     let post = get_post_by_id(post_id, &pool).await?;
 
-    Ok(HttpResponse::Ok().json(serde_json::json!({"post": post})))
+    Ok(HttpResponse::Ok().json(serde_json::json!({"posts": post})))
+}
+
+async fn get_post_by_id(id: Uuid, pool: &PgPool) -> Result<PostResponse, PostError> {
+    let record = sqlx::query_as::<_, PostRecord>(
+        r#"
+        SELECT 0::BIGINT as total_count, id, title, post_text, img, version, liked_by, created_by, created_at
+        FROM posts
+        WHERE id = $1 AND deleted_at IS NULL
+        "#,
+    )
+        .bind(id)
+        .fetch_optional(pool)
+        .await
+        .context("Failed to fetch posts from database")?;
+
+    match record {
+        Some(rec) => Ok(PostResponse::from(rec)),
+        None => Err(PostError::NotFound),
+    }
 }
 
 #[tracing::instrument(
@@ -198,7 +204,7 @@ pub async fn create_post(
     let (id, created_at) =
         insert_post_and_return_inserted_data(&post.title, &post.text, &post.img, user_id, &pool)
             .await
-            .context("Failed to insert post record")?;
+            .context("Failed to insert posts record")?;
 
     let response = CreatePostResponse {
         id,
@@ -237,7 +243,7 @@ pub async fn insert_post_and_return_inserted_data(
     )
     .fetch_one(pool)
     .await
-    .context("Failed to insert new post into database")?;
+    .context("Failed to insert new posts into database")?;
     tracing::Span::current().record("post_id", tracing::field::display(&record.id));
     Ok((record.id, record.created_at))
 }
@@ -259,14 +265,16 @@ impl TryFrom<UpdatePostPayload> for Post {
 
 #[tracing::instrument(
     skip(pool),
-    fields(post_id=%path.id)
+    fields(user_id=tracing::field::Empty, post_id=%path.id)
 )]
 pub async fn update_post(
     path: web::Path<PostPathParams>,
     payload: web::Json<UpdatePostPayload>,
     pool: web::Data<PgPool>,
+    user_id: web::ReqData<UserId>,
 ) -> Result<HttpResponse, PostError> {
     let post_id = path.id;
+    tracing::Span::current().record("user_id", tracing::field::display(&*user_id.into_inner()));
     let validated_post: Post = payload.0.try_into().map_err(PostError::ValidationError)?;
     let mut post = get_post_by_id(post_id, &pool).await?;
 
@@ -284,26 +292,7 @@ pub async fn update_post(
     post.text = validated_post.text.as_ref().to_string();
     post.img = validated_post.img.as_ref().to_string();
 
-    Ok(HttpResponse::Ok().json(serde_json::json!({ "post": post })))
-}
-
-async fn get_post_by_id(id: Uuid, pool: &PgPool) -> Result<PostResponse, PostError> {
-    let record = sqlx::query_as::<_, PostRecord>(
-        r#"
-        SELECT 0::BIGINT as total_count, id, title, post_text, img, version, liked_by, created_by, created_at
-        FROM posts
-        WHERE id = $1 AND deleted_at IS NULL
-        "#,
-    )
-        .bind(id)
-        .fetch_optional(pool)
-        .await
-        .context("Failed to fetch post from database")?;
-
-    match record {
-        Some(rec) => Ok(PostResponse::from(rec)),
-        None => Err(PostError::NotFound),
-    }
+    Ok(HttpResponse::Ok().json(serde_json::json!({ "posts": post })))
 }
 
 #[tracing::instrument(skip_all, fields(post_id=%id))]
@@ -361,37 +350,7 @@ pub async fn delete_post(
     )
     .execute(&**pool)
     .await
-    .context("Failed to mark post as deleted")?;
-
-    if result.rows_affected() == 0 {
-        return Err(PostError::NotFound);
-    }
-
-    Ok(HttpResponse::Ok().finish())
-}
-
-#[tracing::instrument(
-    skip(pool),
-    fields(post_id=%path.id)
-)]
-pub async fn hard_delete_post(
-    path: web::Path<PostPathParams>,
-    pool: web::Data<PgPool>,
-    user_id: web::ReqData<UserId>,
-) -> Result<HttpResponse, PostError> {
-    let post_id = path.id;
-
-    // Soft delete: mark deleted_at = now()
-    let result = sqlx::query!(
-        r#"
-        DELETE FROM posts
-	    WHERE id = $1
-        "#,
-        post_id
-    )
-    .execute(&**pool)
-    .await
-    .context("Failed to hard delete post")?;
+    .context("Failed to mark posts as deleted")?;
 
     if result.rows_affected() == 0 {
         return Err(PostError::NotFound);
@@ -416,7 +375,7 @@ pub async fn like_post(
 
     add_like_to_post(post_id, *user_id, &pool).await?;
 
-    Ok(HttpResponse::Ok().json(serde_json::json!({ "post": post })))
+    Ok(HttpResponse::Ok().json(serde_json::json!({ "posts": post })))
 }
 
 #[tracing::instrument(
@@ -435,10 +394,10 @@ pub async fn dislike_post(
 
     remove_like_from_post(post_id, *user_id, &pool).await?;
 
-    Ok(HttpResponse::Ok().json(serde_json::json!({ "post": post })))
+    Ok(HttpResponse::Ok().json(serde_json::json!({ "posts": post })))
 }
 
-#[tracing::instrument(skip(pool), fields(post_id=%post_id, user_id=%user_id))]
+#[tracing::instrument(skip(pool))]
 async fn add_like_to_post(post_id: Uuid, user_id: Uuid, pool: &PgPool) -> Result<(), PostError> {
     // unnest() converts an array into a set of rows (like a table column).
     // t(x) means "create a temporary table t with one column x holding each value from the array."
@@ -457,7 +416,7 @@ async fn add_like_to_post(post_id: Uuid, user_id: Uuid, pool: &PgPool) -> Result
     )
     .execute(pool)
     .await
-    .context("Failed to add like to post")?;
+    .context("Failed to add like to posts")?;
 
     if result.rows_affected() == 0 {
         return Err(PostError::NotFound);
@@ -466,7 +425,7 @@ async fn add_like_to_post(post_id: Uuid, user_id: Uuid, pool: &PgPool) -> Result
     Ok(())
 }
 
-#[tracing::instrument(skip(pool), fields(post_id=%post_id, user_id=%user_id))]
+#[tracing::instrument(skip(pool))]
 async fn remove_like_from_post(
     post_id: Uuid,
     user_id: Uuid,
@@ -483,7 +442,7 @@ async fn remove_like_from_post(
     )
     .execute(pool)
     .await
-    .context("Failed to remove like from post")?;
+    .context("Failed to remove like from posts")?;
 
     if result.rows_affected() == 0 {
         return Err(PostError::NotFound);

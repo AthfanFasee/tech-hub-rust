@@ -107,7 +107,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
             web::scope("/v1")
                 .service(web::scope("/user").configure(user_routes))
                 .service(web::scope("/admin").configure(admin_routes))
-                .service(web::scope("/post").configure(post_routes))
+                .service(web::scope("/posts").configure(post_routes))
                 .service(web::scope("/comment").configure(comment_routes)),
         );
 }

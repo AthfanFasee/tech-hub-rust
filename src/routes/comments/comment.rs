@@ -75,7 +75,7 @@ pub async fn get_comments_for_post(
     .bind(post_id)
     .fetch_all(pool)
     .await
-    .context("Failed to load comments for post")?;
+    .context("Failed to load comments for posts")?;
 
     let comments = rows.into_iter().map(CommentResponseBody::from).collect();
 
