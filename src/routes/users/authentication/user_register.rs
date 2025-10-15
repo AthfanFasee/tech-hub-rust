@@ -12,7 +12,6 @@ use actix_web::{HttpResponse, web};
 use anyhow::Context;
 use secrecy::{ExposeSecret, Secret};
 use serde::Deserialize;
-use serde::Serialize;
 use sqlx::{Executor, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
@@ -41,12 +40,6 @@ impl ResponseError for UserRegisterError {
 
         build_error_response(status_code, self.to_string())
     }
-}
-
-#[derive(Serialize)]
-struct SuccessResponse {
-    code: u16,
-    message: String,
 }
 
 #[derive(Deserialize)]
@@ -115,12 +108,7 @@ pub async fn register_user(
         .await
         .context("Failed to send a user activation email")?;
 
-    let success = SuccessResponse {
-        code: 200,
-        message: "User added successfully".to_string(),
-    };
-
-    Ok(HttpResponse::Ok().json(success))
+    Ok(HttpResponse::Ok().finish())
 }
 
 #[tracing::instrument(

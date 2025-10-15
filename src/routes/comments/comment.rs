@@ -1,10 +1,10 @@
 use crate::authentication::UserId;
-use crate::domain::Comment;
+use crate::domain::{Comment, CommentRecord, CommentResponseBody, CreateCommentPayload};
 use crate::{build_error_response, error_chain_fmt};
 use actix_web::{HttpResponse, ResponseError, web};
 use anyhow::Context;
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sqlx::PgPool;
 use thiserror::Error;
 use uuid::Uuid;
@@ -63,7 +63,7 @@ pub async fn get_comments_for_post(
     post_id: Uuid,
     pool: &PgPool,
 ) -> Result<Vec<CommentResponseBody>, anyhow::Error> {
-    let rows = sqlx::query!(
+    let rows = sqlx::query_as::<_, CommentRecord>(
         r#"
         SELECT c.id, c.text, c.created_by, c.post_id, u.user_name AS user_name, c.created_at
         FROM comments c
@@ -71,47 +71,15 @@ pub async fn get_comments_for_post(
         WHERE post_id = $1
         ORDER BY c.id DESC
         "#,
-        post_id
     )
+    .bind(post_id)
     .fetch_all(pool)
     .await
     .context("Failed to load comments for post")?;
 
-    let comments = rows
-        .into_iter()
-        .map(|r| CommentResponseBody {
-            id: r.id,
-            text: r.text,
-            created_by: r.created_by,
-            post_id: r.post_id,
-            created_at: r.created_at,
-        })
-        .collect();
+    let comments = rows.into_iter().map(CommentResponseBody::from).collect();
 
     Ok(comments)
-}
-
-#[derive(Deserialize, Debug)]
-pub struct CreateCommentPayload {
-    pub text: String,
-    pub post_id: String,
-}
-
-impl TryFrom<CreateCommentPayload> for Comment {
-    type Error = String;
-
-    fn try_from(value: CreateCommentPayload) -> Result<Self, Self::Error> {
-        Comment::new(value.text, value.post_id)
-    }
-}
-
-#[derive(Serialize, Debug)]
-pub struct CommentResponseBody {
-    pub id: Uuid,
-    pub text: String,
-    pub post_id: Uuid,
-    pub created_at: DateTime<Utc>,
-    pub created_by: Uuid,
 }
 
 #[tracing::instrument(skip_all)]
