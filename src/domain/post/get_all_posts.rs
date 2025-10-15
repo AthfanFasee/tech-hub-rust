@@ -24,6 +24,22 @@ impl AsRef<str> for QueryTitle {
 }
 
 #[derive(Debug)]
+pub struct CreatedBy(Uuid);
+
+impl CreatedBy {
+    pub fn parse(s: String) -> Result<Self, String> {
+        let created_by = Uuid::parse_str(&s).map_err(|_| "Invalid UUID format: created_by")?;
+        Ok(Self(created_by))
+    }
+}
+
+impl AsRef<Uuid> for CreatedBy {
+    fn as_ref(&self) -> &Uuid {
+        &self.0
+    }
+}
+
+#[derive(Debug)]
 pub struct Page(i32);
 
 impl Page {
@@ -67,7 +83,6 @@ impl Limit {
 
 #[derive(Debug)]
 pub enum SortField {
-    Id,
     Title,
     LikesCount,
     CreatedAt,
@@ -82,6 +97,7 @@ pub enum SortDirection {
 #[derive(Debug)]
 pub struct Sort {
     field: SortField,
+    // make this field public, but only within the current crate
     pub(crate) direction: SortDirection,
 }
 
@@ -111,7 +127,6 @@ impl Sort {
         };
 
         let field = match field_str {
-            "id" => SortField::Id,
             "title" => SortField::Title,
             "created_at" => SortField::CreatedAt,
             "likescount" => SortField::LikesCount,
@@ -123,7 +138,6 @@ impl Sort {
 
     pub fn to_sql(&self) -> String {
         let column = match self.field {
-            SortField::Id => "id",
             SortField::Title => "title",
             SortField::CreatedAt => "created_at",
             SortField::LikesCount => "ARRAY_LENGTH(liked_by, 1)",
