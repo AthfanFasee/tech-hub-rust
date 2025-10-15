@@ -100,7 +100,7 @@ async fn create_post_persists_valid_post_and_returns_201() {
 #[tokio::test]
 async fn user_must_be_logged_in_to_update_post() {
     let app = spawn_app().await;
-    let post_id = uuid::Uuid::new_v4();
+    let post_id = Uuid::new_v4();
 
     let payload = json!({
         "title": "Updated title",
@@ -153,7 +153,7 @@ async fn update_post_returns_404_if_not_found() {
         "img": "https://example.com/updated.jpg"
     });
 
-    let response = app.update_post(&uuid::Uuid::new_v4(), &payload).await;
+    let response = app.update_post(&Uuid::new_v4(), &payload).await;
 
     assert_eq!(
         404,
@@ -233,7 +233,7 @@ async fn delete_post_returns_404_for_nonexistent_id() {
     let app = spawn_app().await;
     app.login().await;
 
-    let random_id = uuid::Uuid::new_v4();
+    let random_id = Uuid::new_v4();
     let response = app.delete_post(&random_id).await;
 
     assert_eq!(
@@ -264,7 +264,7 @@ async fn delete_post_returns_404_if_already_deleted() {
 async fn delete_post_requires_authentication() {
     let app = spawn_app().await;
 
-    let random_id = uuid::Uuid::new_v4();
+    let random_id = Uuid::new_v4();
     let response = app.delete_post(&random_id).await;
 
     assert_eq!(
@@ -326,7 +326,7 @@ async fn hard_delete_returns_404_for_nonexistent_post() {
     let app = spawn_app().await;
     app.login_admin().await;
 
-    let random_id = uuid::Uuid::new_v4();
+    let random_id = Uuid::new_v4();
     let response = app.hard_delete_post(&random_id).await;
 
     assert_eq!(

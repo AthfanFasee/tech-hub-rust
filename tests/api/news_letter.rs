@@ -25,7 +25,7 @@ async fn newsletters_are_not_delivered_to_inactivated_user() {
         }
     });
 
-    let key = uuid::Uuid::new_v4().to_string();
+    let key = Uuid::new_v4().to_string();
     let response = app.publish_newsletters(&newsletter_body, Some(&key)).await;
     assert_eq!(response.status().as_u16(), 200);
 
@@ -53,7 +53,7 @@ async fn newsletters_are_not_delivered_to_confirmed_but_unsubscribed_users() {
         }
     });
 
-    let key = uuid::Uuid::new_v4().to_string();
+    let key = Uuid::new_v4().to_string();
     let response = app.publish_newsletters(&newsletter_body, Some(&key)).await;
     assert_eq!(response.status().as_u16(), 200);
 
@@ -77,7 +77,7 @@ async fn newsletters_returns_400_for_invalid_data() {
     ];
 
     for (invalid_body, desc) in invalid_cases {
-        let key = uuid::Uuid::new_v4().to_string();
+        let key = Uuid::new_v4().to_string();
         let response = app.publish_newsletters(&invalid_body, Some(&key)).await;
         assert_eq!(
             400,
@@ -102,7 +102,7 @@ async fn non_admins_are_rejected_to_publish_newsletters() {
         }
     });
 
-    let key = uuid::Uuid::new_v4().to_string();
+    let key = Uuid::new_v4().to_string();
     let response = app.publish_newsletters(&newsletter_body, Some(&key)).await;
     assert_eq!(response.status().as_u16(), 403);
 }
@@ -119,7 +119,7 @@ async fn anonymous_users_cannot_publish_newsletters() {
         }
     });
 
-    let key = uuid::Uuid::new_v4().to_string();
+    let key = Uuid::new_v4().to_string();
     let response = app.publish_newsletters(&newsletter_body, Some(&key)).await;
     assert_eq!(response.status().as_u16(), 401);
 }
@@ -145,7 +145,7 @@ async fn newsletters_are_delivered_to_a_user_who_subscribed_via_the_full_flow() 
         }
     });
 
-    let key = uuid::Uuid::new_v4().to_string();
+    let key = Uuid::new_v4().to_string();
     let response = app.publish_newsletters(&newsletter_body, Some(&key)).await;
     assert_eq!(response.status().as_u16(), 200);
 
@@ -173,7 +173,7 @@ async fn newsletter_publishing_is_idempotent() {
         }
     });
 
-    let key = uuid::Uuid::new_v4().to_string();
+    let key = Uuid::new_v4().to_string();
     // Stimulate publishing newsletters twice back to back
     let response = app.publish_newsletters(&newsletter_body, Some(&key)).await;
     assert_eq!(response.status().as_u16(), 200);
@@ -205,7 +205,7 @@ async fn concurrent_newsletter_publishing_is_handled_gracefully() {
         }
     });
 
-    let key = uuid::Uuid::new_v4().to_string();
+    let key = Uuid::new_v4().to_string();
     let response1 = app.publish_newsletters(&newsletter_body, Some(&key));
     let response2 = app.publish_newsletters(&newsletter_body, Some(&key));
 
@@ -241,7 +241,7 @@ async fn failed_newsletter_delivery_is_retried_with_back_off() {
         }
     });
 
-    let key = uuid::Uuid::new_v4().to_string();
+    let key = Uuid::new_v4().to_string();
     let response = app.publish_newsletters(&newsletter_body, Some(&key)).await;
     assert_eq!(response.status().as_u16(), 200);
 
