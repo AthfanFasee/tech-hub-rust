@@ -5,13 +5,13 @@ mod text;
 mod title;
 
 use chrono::{DateTime, Utc};
-use uuid::Uuid;
 pub use get_all_posts::*;
 pub use img::Img;
 pub use new_post::Post;
+use serde::{Deserialize, Serialize};
 pub use text::Text;
 pub use title::Title;
-
+use uuid::Uuid;
 
 #[derive(sqlx::FromRow)]
 pub struct PostRecord {
@@ -51,5 +51,31 @@ impl From<PostRecord> for PostResponse {
             created_by: record.created_by,
             liked_by: record.liked_by.unwrap_or_default(),
         }
+    }
+}
+
+#[derive(Deserialize, Debug)]
+pub struct CreatePostPayload {
+    title: String,
+    text: String,
+    img: String,
+}
+
+#[derive(Serialize)]
+pub struct CreatePostResponse<'a> {
+    pub id: Uuid,
+    pub title: &'a str,
+    pub post_text: &'a str,
+    pub img: &'a str,
+    pub created_at: DateTime<Utc>,
+    pub created_by: Uuid,
+}
+
+impl TryFrom<CreatePostPayload> for Post {
+    type Error = String;
+
+    fn try_from(payload: CreatePostPayload) -> Result<Self, Self::Error> {
+        let post = Self::new(payload.title, payload.text, payload.img)?;
+        Ok(post)
     }
 }

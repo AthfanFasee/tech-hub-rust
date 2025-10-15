@@ -1,13 +1,15 @@
 use crate::authentication::UserId;
-use crate::domain::{CreatedBy, Filters, GetAllPostsQuery, Img, Limit, Metadata, Page, Post, PostRecord, PostResponse, QueryTitle, Sort, SortDirection, Text, Title};
+use crate::domain::{
+    CreatePostPayload, CreatePostResponse, CreatedBy, Filters, GetAllPostsQuery, Img, Limit,
+    Metadata, Page, Post, PostRecord, PostResponse, QueryTitle, Sort, SortDirection, Text, Title,
+};
 use crate::{build_error_response, error_chain_fmt};
-use actix_web::http::StatusCode;
 use actix_web::ResponseError;
-use actix_web::{web, HttpResponse};
+use actix_web::http::StatusCode;
+use actix_web::{HttpResponse, web};
 use anyhow::Context;
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
-use serde::Serialize;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -122,7 +124,7 @@ async fn fetch_posts_with_count(
 
     let query = format!(
         r#"
-        SELECT COUNT(*) OVER() AS total_count,
+        SELECT COUNT(*) OVER()::BIGINT AS total_count,
                p.id, p.title, p.post_text, p.img, p.version,
                p.liked_by, p.created_by, p.created_at, u.user_name as created_by_name
         FROM posts p
@@ -156,19 +158,7 @@ async fn fetch_posts_with_count(
 
     let total_count = records.first().map(|r| r.total_count).unwrap_or(0);
 
-    let posts = records
-        .into_iter()
-        .map(|record| PostResponse {
-            id: record.id,
-            title: record.title,
-            text: record.post_text,
-            img: record.img,
-            version: record.version,
-            created_at: record.created_at,
-            created_by: record.created_by,
-            liked_by: record.liked_by.unwrap_or_default(),
-        })
-        .collect();
+    let posts = records.into_iter().map(PostResponse::from).collect();
 
     Ok((posts, total_count))
 }
@@ -193,31 +183,6 @@ pub async fn get_post(
     Ok(HttpResponse::Ok().json(serde_json::json!({"post": post})))
 }
 
-#[derive(Deserialize, Debug)]
-pub struct CreatePostPayload {
-    title: String,
-    text: String,
-    img: String,
-}
-
-#[derive(Serialize)]
-pub struct CreatePostResponseBody<'a> {
-    pub id: Uuid,
-    pub title: &'a str,
-    pub post_text: &'a str,
-    pub img: &'a str,
-    pub created_at: DateTime<Utc>,
-    pub created_by: Uuid,
-}
-
-impl TryFrom<CreatePostPayload> for Post {
-    type Error = String;
-
-    fn try_from(payload: CreatePostPayload) -> Result<Self, Self::Error> {
-        let post = Self::new(payload.title, payload.text, payload.img)?;
-        Ok(post)
-    }
-}
 #[tracing::instrument(
     skip(pool),
     fields(user_id=%&*user_id)
@@ -235,7 +200,7 @@ pub async fn create_post(
             .await
             .context("Failed to insert post record")?;
 
-    let response = CreatePostResponseBody {
+    let response = CreatePostResponse {
         id,
         title: post.title.as_ref(),
         post_text: post.text.as_ref(),
@@ -270,9 +235,9 @@ pub async fn insert_post_and_return_inserted_data(
         img.as_ref(),
         *created_by,
     )
-        .fetch_one(pool)
-        .await
-        .context("Failed to insert new post into database")?;
+    .fetch_one(pool)
+    .await
+    .context("Failed to insert new post into database")?;
     tracing::Span::current().record("post_id", tracing::field::display(&record.id));
     Ok((record.id, record.created_at))
 }
@@ -313,7 +278,7 @@ pub async fn update_post(
         post.version,
         &pool,
     )
-        .await?;
+    .await?;
 
     post.title = validated_post.title.as_ref().to_string();
     post.text = validated_post.text.as_ref().to_string();
@@ -323,29 +288,20 @@ pub async fn update_post(
 }
 
 async fn get_post_by_id(id: Uuid, pool: &PgPool) -> Result<PostResponse, PostError> {
-    let record = sqlx::query!(
+    let record = sqlx::query_as::<_, PostRecord>(
         r#"
-        SELECT id, title, post_text, img, version, created_at, created_by, liked_by
+        SELECT 0::BIGINT as total_count, id, title, post_text, img, version, liked_by, created_by, created_at
         FROM posts
         WHERE id = $1 AND deleted_at IS NULL
         "#,
-        id
     )
+        .bind(id)
         .fetch_optional(pool)
         .await
         .context("Failed to fetch post from database")?;
 
     match record {
-        Some(rec) => Ok(PostResponse {
-            id: rec.id,
-            title: rec.title,
-            text: rec.post_text,
-            img: rec.img,
-            version: rec.version,
-            created_at: rec.created_at,
-            created_by: rec.created_by,
-            liked_by: rec.liked_by,
-        }),
+        Some(rec) => Ok(PostResponse::from(rec)),
         None => Err(PostError::NotFound),
     }
 }
@@ -371,9 +327,9 @@ async fn update_post_in_db(
         id,
         version
     )
-        .execute(pool)
-        .await
-        .context("Failed to execute update query")?;
+    .execute(pool)
+    .await
+    .context("Failed to execute update query")?;
 
     if result.rows_affected() == 0 {
         return Err(PostError::EditConflict);
@@ -403,9 +359,9 @@ pub async fn delete_post(
         Utc::now(),
         post_id
     )
-        .execute(&**pool)
-        .await
-        .context("Failed to mark post as deleted")?;
+    .execute(&**pool)
+    .await
+    .context("Failed to mark post as deleted")?;
 
     if result.rows_affected() == 0 {
         return Err(PostError::NotFound);
@@ -433,9 +389,9 @@ pub async fn hard_delete_post(
         "#,
         post_id
     )
-        .execute(&**pool)
-        .await
-        .context("Failed to hard delete post")?;
+    .execute(&**pool)
+    .await
+    .context("Failed to hard delete post")?;
 
     if result.rows_affected() == 0 {
         return Err(PostError::NotFound);
@@ -499,9 +455,9 @@ async fn add_like_to_post(post_id: Uuid, user_id: Uuid, pool: &PgPool) -> Result
         user_id,
         post_id
     )
-        .execute(pool)
-        .await
-        .context("Failed to add like to post")?;
+    .execute(pool)
+    .await
+    .context("Failed to add like to post")?;
 
     if result.rows_affected() == 0 {
         return Err(PostError::NotFound);
@@ -525,9 +481,9 @@ async fn remove_like_from_post(
         user_id,
         post_id
     )
-        .execute(pool)
-        .await
-        .context("Failed to remove like from post")?;
+    .execute(pool)
+    .await
+    .context("Failed to remove like from post")?;
 
     if result.rows_affected() == 0 {
         return Err(PostError::NotFound);
@@ -535,5 +491,3 @@ async fn remove_like_from_post(
 
     Ok(())
 }
-
-

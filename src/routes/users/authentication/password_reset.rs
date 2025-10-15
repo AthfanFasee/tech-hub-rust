@@ -7,7 +7,6 @@ use actix_web::{HttpResponse, ResponseError, web};
 use anyhow::Context;
 use secrecy::ExposeSecret;
 use secrecy::Secret;
-use serde::Serialize;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -37,12 +36,6 @@ impl ResponseError for PasswordResetError {
 
         build_error_response(status_code, self.to_string())
     }
-}
-
-#[derive(Serialize)]
-struct SuccessResponse {
-    code: u16,
-    message: String,
 }
 
 #[derive(serde::Deserialize)]
@@ -93,11 +86,7 @@ pub async fn change_password(
 
     crate::authentication::change_password(*user_id, new_password.into_secret(), &pool).await?;
 
-    let success = SuccessResponse {
-        code: 200,
-        message: "Password changed successfully".to_string(),
-    };
-    Ok(HttpResponse::Ok().json(success))
+    Ok(HttpResponse::Ok().finish())
 }
 
 pub async fn get_username(user_id: Uuid, pool: &PgPool) -> Result<String, anyhow::Error> {
