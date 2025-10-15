@@ -137,7 +137,6 @@ async fn newsletters_are_delivered_to_a_user_who_subscribed_via_the_full_flow() 
         .mount(&app.email_server)
         .await;
 
-    // Publish newsletter
     let newsletter_body = serde_json::json!({
         "title": "Test Newsletter",
         "content": {
@@ -166,7 +165,6 @@ async fn newsletter_publishing_is_idempotent() {
         .mount(&app.email_server)
         .await;
 
-    // Publish newsletter
     let newsletter_body = serde_json::json!({
         "title": "Test Newsletter",
         "content": {
@@ -199,7 +197,6 @@ async fn concurrent_newsletter_publishing_is_handled_gracefully() {
         .mount(&app.email_server)
         .await;
 
-    // Publish newsletter
     let newsletter_body = serde_json::json!({
         "title": "Test Newsletter",
         "content": {
@@ -236,7 +233,6 @@ async fn failed_newsletter_delivery_is_retried_with_back_off() {
         .mount(&app.email_server)
         .await;
 
-    // Publish newsletter
     let newsletter_body = serde_json::json!({
         "title": "Test Newsletter",
         "content": {
