@@ -74,7 +74,7 @@ impl TestApp {
             .expect("Failed to execute PATCH request.")
     }
 
-    pub async fn send_delete(&self, endpoint: &str) -> reqwest::Response {
+    pub async fn send_delete(&self, endpoint: &str) -> Response {
         self.api_client
             .delete(format!("{}/{}", &self.address, endpoint))
             .send()
