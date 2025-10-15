@@ -6,4 +6,4 @@ Implements hexagonal architecture and domain modeling with compile-time validati
 
 Delivers full-fledged telemetry with tracing spans, performance metrics, and error handling at the right level of abstraction. Deployed using multi-stage Docker builds on AWS ECS with RDS and ElastiCache (Redis) for reliable, scalable operation.
 
-**Skills: Rust (Programming Language) · PostgreSQL · Actix Web · Redis · Docker · Amazon Web Services (AWS)**
+**Skills: Rust (Programming Language) · PostgreSQL · Actix Web · Redis · Docker · Amazon Web Services (AWS) · Bash**
