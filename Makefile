@@ -7,6 +7,18 @@ run:
 	@echo "Running cargo run with with bunyan formatted logs..."
 	cargo run | bunyan
 
+# Run full command: starts existing containers and runs the app
+run-full:
+	@echo "Starting existing Postgres and Redis containers..."
+	@docker start techhub_postgres || echo "Postgres container not found. Run 'make run-scratch' instead."
+	@docker start techhub_redis || echo "Redis container not found. Run 'make run-scratch' instead."
+	@echo "Running cargo fmt..."
+	cargo fmt
+	@echo "Running cargo check..."
+	cargo check
+	@echo "Running cargo run with bunyan formatted logs..."
+	cargo run | bunyan
+
 
 # Test command: performs check, format, and test
 test:
@@ -14,6 +26,18 @@ test:
 	cargo check
 	@echo "Running cargo fmt..."
 	cargo fmt
+	@echo "Running cargo test"
+	@unset RUST_LOG && unset TEST_LOG && cargo test
+
+# Test full command: starts existing containers and runs tests
+test-full:
+	@echo "Starting existing Postgres and Redis containers..."
+	@docker start techhub_postgres || echo "Postgres container not found. Run 'make run-scratch' instead."
+	@docker start techhub_redis || echo "Redis container not found. Run 'make run-scratch' instead."
+	@echo "Running cargo fmt..."
+	cargo fmt
+	@echo "Running cargo check..."
+	cargo check
 	@echo "Running cargo test"
 	@unset RUST_LOG && unset TEST_LOG && cargo test
 
