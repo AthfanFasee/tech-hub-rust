@@ -1,7 +1,7 @@
 use crate::authentication::UserId;
 use crate::domain::{
-    CreatePostPayload, CreatePostResponse, CreatedBy, Filters, GetAllPostsQuery, Img, Limit,
-    Metadata, Page, Post, PostRecord, PostResponse, QueryTitle, Sort, SortDirection, Text, Title,
+    CreatePostPayload, CreatePostResponse, CreatedBy, Filters, GetAllPostsQuery, Img, Metadata,
+    Post, PostQuery, PostRecord, PostResponse, QueryTitle, SortDirection, Text, Title,
 };
 use crate::{build_error_response, error_chain_fmt};
 use actix_web::ResponseError;
@@ -18,7 +18,7 @@ pub enum PostError {
     #[error("{0}")]
     ValidationError(String),
 
-    #[error("posts not found")]
+    #[error("post not found")]
     NotFound,
 
     #[error("edit conflict: posts was modified by another request")]
@@ -52,32 +52,22 @@ pub async fn get_all_posts(
     query: web::Query<GetAllPostsQuery>,
     pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, PostError> {
-    let query = query.into_inner();
-    // Parse and validate query parameters
-    let title = if query.title.is_empty() {
-        None
-    } else {
-        Some(QueryTitle::parse(query.title).map_err(PostError::ValidationError)?)
-    };
+    let parsed_query =
+        PostQuery::try_from(query.into_inner()).map_err(PostError::ValidationError)?;
 
-    let created_by_id = if query.id.is_empty() {
-        None
-    } else {
-        Some(CreatedBy::parse(query.id).map_err(PostError::ValidationError)?)
-    };
+    let (posts, total_records) = fetch_posts_with_count(
+        parsed_query.title.as_ref(),
+        parsed_query.created_by_id.as_ref(),
+        &parsed_query.filters,
+        &pool,
+    )
+    .await?;
 
-    let page = Page::parse(query.page).map_err(PostError::ValidationError)?;
-    let limit = Limit::parse(query.limit).map_err(PostError::ValidationError)?;
-    let sort = Sort::parse(&query.sort).map_err(PostError::ValidationError)?;
-
-    let filters = Filters { page, limit, sort };
-
-    // Fetch posts and count
-    let (posts, total_records) =
-        fetch_posts_with_count(title.as_ref(), created_by_id.as_ref(), &filters, &pool).await?;
-
-    // Calculate metadata
-    let metadata = Metadata::calculate(total_records, filters.page.value(), filters.limit.value());
+    let metadata = Metadata::calculate(
+        total_records,
+        parsed_query.filters.page.value(),
+        parsed_query.filters.limit.value(),
+    );
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "posts": posts,

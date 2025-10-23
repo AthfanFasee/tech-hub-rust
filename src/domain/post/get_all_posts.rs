@@ -2,6 +2,32 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+pub struct PostQuery {
+    pub title: Option<QueryTitle>,
+    pub created_by_id: Option<CreatedBy>,
+    pub filters: Filters,
+}
+
+impl TryFrom<GetAllPostsQuery> for PostQuery {
+    type Error = String;
+
+    fn try_from(query: GetAllPostsQuery) -> Result<Self, Self::Error> {
+        Ok(PostQuery {
+            title: (!query.title.is_empty())
+                .then(|| QueryTitle::parse(query.title))
+                .transpose()?,
+            created_by_id: (!query.id.is_empty())
+                .then(|| CreatedBy::parse(query.id))
+                .transpose()?,
+            filters: Filters {
+                page: Page::parse(query.page)?,
+                limit: Limit::parse(query.limit)?,
+                sort: Sort::parse(&query.sort)?,
+            },
+        })
+    }
+}
+
 #[derive(Debug)]
 pub struct QueryTitle(String);
 
