@@ -17,7 +17,7 @@ impl TestApp {
     pub async fn publish_newsletters(
         &self,
         payload: &Value,
-        idempotency_key: Option<&String>,
+        idempotency_key: Option<&str>,
     ) -> Response {
         if let Some(key) = idempotency_key {
             let mut headers = HeaderMap::new();

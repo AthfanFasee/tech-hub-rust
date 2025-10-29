@@ -17,36 +17,43 @@ async fn try_main() -> anyhow::Result<()> {
     telemetry::init_subscriber(subscriber);
     let config = configuration::get_config().expect("Failed to read config");
     let application = Application::build(config.clone()).await?;
+
     let application_task = tokio::spawn(application.run_until_stopped());
     let worker_task = tokio::spawn(run_worker_until_stopped(config));
 
     tokio::select! {
-    o = application_task => report_exit("API", o),
-    o = worker_task => report_exit("Newsletter issue background worker", o),
+        o = application_task => {
+            report_exit("API", &o);
+            o??
+        },
+        o = worker_task => {
+            report_exit("Newsletter issue background worker", &o);
+            o??
+        },
     }
 
     Ok(())
 }
 
-fn report_exit(task_name: &str, outcome: Result<Result<(), impl Debug + Display>, JoinError>) {
+fn report_exit(task_name: &str, outcome: &Result<Result<(), impl Debug + Display>, JoinError>) {
     match outcome {
         Ok(Ok(())) => {
             tracing::info!("{} has exited", task_name)
         }
         Ok(Err(e)) => {
             tracing::error!(
-            error.cause_chain = ?e,
-            error.message = %e,
-            "{} failed",
-            task_name
+                error.cause_chain = ?e,
+                error.message = %e,
+                "{} failed",
+                task_name
             )
         }
         Err(e) => {
             tracing::error!(
-            error.cause_chain = ?e,
-            error.message = %e,
-            "{}' task failed to complete",
-            task_name
+                error.cause_chain = ?e,
+                error.message = %e,
+                "{} task failed to complete",
+                task_name
             )
         }
     }
