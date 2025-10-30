@@ -19,7 +19,7 @@ pub fn build_error_response(status_code: StatusCode, message: String) -> HttpRes
 }
 
 pub fn error_chain_fmt(
-    e: &(dyn std::error::Error),
+    e: &dyn std::error::Error,
     f: &mut std::fmt::Formatter<'_>,
 ) -> std::fmt::Result {
     writeln!(f, "{e}")?;
