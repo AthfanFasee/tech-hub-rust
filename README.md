@@ -19,8 +19,6 @@ and token-based session authentication.
 - **Deployment**: Docker, AWS ECS, RDS, ElastiCache
 - **Monitoring**: Tracing, metrics, structured logging
 
----
-
 ## 🏗 Architecture & Design
 
 ### **Hexagonal Architecture (Ports and Adapters)**
