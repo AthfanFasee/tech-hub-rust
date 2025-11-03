@@ -1,5 +1,7 @@
 use crate::authentication::UserId;
-use crate::domain::{Comment, CommentRecord, CommentResponseBody, CreateCommentPayload};
+use crate::domain::{
+    Comment, CommentRecord, CommentResponseBody, CreateCommentPayload, CreateCommentResponseBody,
+};
 use crate::{build_error_response, error_chain_fmt};
 use actix_web::{HttpResponse, ResponseError, web};
 use anyhow::Context;
@@ -82,7 +84,7 @@ pub async fn get_comments_for_post(
     Ok(comments)
 }
 
-#[tracing::instrument(skip_all)]
+#[tracing::instrument(skip(pool), fields(user_id=%&*user_id))]
 pub async fn create_comment(
     payload: web::Json<CreateCommentPayload>,
     pool: web::Data<PgPool>,
@@ -90,22 +92,24 @@ pub async fn create_comment(
 ) -> Result<HttpResponse, CommentError> {
     let user_id = user_id.into_inner();
 
-    let comment: Comment = Comment::new(payload.text.clone(), payload.post_id.clone())
+    let comment: Comment = payload
+        .0
+        .try_into()
         .map_err(CommentError::ValidationError)?;
 
     let (id, created_at) = insert_comment(&comment, *user_id, &pool)
         .await
         .map_err(CommentError::UnexpectedError)?;
 
-    let resp = CommentResponseBody {
+    let resp = CreateCommentResponseBody {
         id,
-        text: comment.text.as_ref().to_string(),
+        text: comment.text.as_ref(),
         post_id: comment.post_id,
         created_at,
         created_by: *user_id,
     };
 
-    Ok(HttpResponse::Created().json(serde_json::json!(resp)))
+    Ok(HttpResponse::Created().json(resp))
 }
 
 #[tracing::instrument(skip(pool), fields(post_id=%comment.post_id))]

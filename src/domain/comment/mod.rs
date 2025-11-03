@@ -17,6 +17,17 @@ pub struct CommentRecord {
     pub user_name: String,
 }
 
+// For creating comments - borrows data
+#[derive(Serialize, Debug)]
+pub struct CreateCommentResponseBody<'a> {
+    pub id: Uuid,
+    pub text: &'a str,
+    pub post_id: Uuid,
+    pub created_at: DateTime<Utc>,
+    pub created_by: Uuid,
+}
+
+// For fetching comments - owns data
 #[derive(Serialize, Debug)]
 pub struct CommentResponseBody {
     pub id: Uuid,
