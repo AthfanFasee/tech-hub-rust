@@ -1,9 +1,49 @@
-TechHub is a Rust-idiomatic, production-grade platform powered by Actix Web and PostgreSQL. Built with TDD and comprehensive end-to-end black-box tests.
+# TechHub
 
-Offers post creation with full-text search and pagination, comments, likes, and admin-driven newsletters to users powered by background workers for async and idempotent email delivery.
+A Rust-idiomatic, production-grade platform powered by Actix Web and PostgreSQL. Built with TDD and comprehensive
+end-to-end black-box tests.
 
-Implements hexagonal architecture and domain modeling with compile-time validation via Rust’s type system. Features a full authentication system including user registration, login, transactional email confirmation, secure password reset, and token-based session authentication, built on concurrency and distributed-systems-safe transactions under strict Postgres isolation guarantees.
+TechHub offers post creation with full-text search and pagination, comments, likes, and admin-driven newsletters powered
+by background workers for async and idempotent email delivery.
 
-Delivers full-fledged telemetry with tracing spans, performance metrics, and error handling at the right level of abstraction. Deployed using multi-stage Docker builds on AWS ECS with RDS and ElastiCache (Redis) for reliable, scalable operation.
+Implements hexagonal architecture and domain modeling with compile-time validation via Rust's type system. Features a
+full authentication system including user registration, login, transactional email confirmation, secure password reset,
+and token-based session authentication.
 
-**Skills: Rust (Programming Language) · PostgreSQL · Actix Web · Redis · Docker · Amazon Web Services (AWS) · Bash**
+## 🚀 Features
+
+- **Authentication System**: User registration, email confirmation, password reset
+- **Content Management**: Posts with full-text search, comments, and likes
+- **Newsletter System**: Admin-driven newsletters with background email delivery
+- **Production Ready**: Tracing, metrics, error handling, and Docker deployment
+- **Security Focused**: Property-based testing and fuzzing for critical paths
+
+## 🛠 Tech Stack
+
+- **Backend**: Rust, Actix Web, Tokio
+- **Database**: PostgreSQL with full-text search
+- **Cache**: Redis
+- **Testing**: Property-based tests, end-to-end tests, fuzzing
+- **Deployment**: Docker, AWS ECS, RDS, ElastiCache
+- **Monitoring**: Tracing, metrics, structured logging
+
+## 📦 Quick Start
+
+### Prerequisites
+
+- Rust 1.90+
+- Docker & Docker Compose
+- PostgreSQL 15+
+- Redis 7+
+
+### Run from Scratch
+
+```bash
+# Clone and setup
+git clone <repository>
+cd techhub
+
+# Start all services (PostgreSQL, Redis, Migrations)
+make run-scratch
+
+# The API will be available at http://localhost:8000
