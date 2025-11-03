@@ -1,7 +1,8 @@
 # TechHub
 
 TechHub is a **Rust-idiomatic, production-grade platform** powered by **Actix Web** and **PostgreSQL**. Built with **TDD
-** and comprehensive **property-based unit tests, fuzzing, and end-to-end black-box integration tests**.
+**
+and comprehensive **property-based unit tests, fuzzing, and end-to-end black-box integration tests**.
 
 Offers post creation with **full-text search and pagination**, comments, likes, and admin-driven newsletters to users
 powered by **background workers** for **async and idempotent email delivery**.
