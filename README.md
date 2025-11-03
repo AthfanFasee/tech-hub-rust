@@ -45,9 +45,9 @@ of external concerns like databases or web frameworks.
 ### Prerequisites
 
 - Rust 1.90+
-- Docker & Docker Compose
-- PostgreSQL 15+
-- Redis 7+
+- Docker
+- PostgreSQL
+- Redis
 
 ### Run from Scratch
 
