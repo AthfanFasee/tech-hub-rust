@@ -127,23 +127,39 @@ test-release: lint
 	@unset RUST_LOG && unset TEST_LOG && cargo test --release --all-targets
 	@echo "Release mode test completed!"
 
-# Test stress command: runs only unit tests 30 times to stress-test property-based tests
-unit-test-stress: lint
-	@echo "Running unit tests 30 times to stress-test property-based tests..."
-	@for i in $$(seq 1 30); do \
-		echo "=== Unit test run $$i/30 ==="; \
+# Test stress command: runs only unit tests multiple times for property-based testing
+unit-test-stress-quick: lint
+	@echo "Running unit tests 10 times for quick property-based testing..."
+	@for i in $$(seq 1 10); do \
+		echo "=== Unit test run $$i/10 ==="; \
 		unset RUST_LOG && unset TEST_LOG && cargo test --lib || exit 1; \
 	done
-	@echo "Unit stress test completed! All 30 runs passed."
+	@echo "Quick stress test completed! All 10 runs passed."
 
-# Test stress with logging command: runs unit tests 30 times with bunyan logging
+unit-test-stress-standard: lint
+	@echo "Running unit tests 20 times for thorough property-based testing..."
+	@for i in $$(seq 1 20); do \
+		echo "=== Unit test run $$i/20 ==="; \
+		unset RUST_LOG && unset TEST_LOG && cargo test --lib || exit 1; \
+	done
+	@echo "Standard stress test completed! All 20 runs passed."
+
+unit-test-stress-thorough: lint
+	@echo "Running unit tests 50 times for exhaustive property-based testing..."
+	@for i in $$(seq 1 50); do \
+		echo "=== Unit test run $$i/50 ==="; \
+		unset RUST_LOG && unset TEST_LOG && cargo test --lib || exit 1; \
+	done
+	@echo "Thorough stress test completed! All 50 runs passed."
+
+# Test stress with logging command: runs unit tests 10 times with bunyan logging
 unit-test-stress-log: lint
-	@echo "Running unit tests 30 times with bunyan logging..."
-	@for i in $$(seq 1 30); do \
-		echo "=== Unit test run $$i/30 ==="; \
+	@echo "Running unit tests 10 times with bunyan logging..."
+	@for i in $$(seq 1 10); do \
+		echo "=== Unit test run $$i/10 ==="; \
 		export RUST_LOG="sqlx=error,info,error" && export TEST_LOG=true && cargo test --lib | bunyan || exit 1; \
 	done
-	@echo "Unit stress test with logging completed! All 30 runs passed."
+	@echo "Unit stress test with logging completed! All 10 runs passed."
 
 
 
