@@ -1,21 +1,26 @@
 use crate::authentication::UserId;
+use crate::domain::{NewsLetterData, Newsletter};
 use crate::idempotency::{IdempotencyKey, NextAction};
 use crate::idempotency::{save_response, try_processing};
 use crate::{build_error_response, error_chain_fmt};
 use actix_web::http::StatusCode;
 use actix_web::{HttpRequest, HttpResponse, ResponseError, web};
 use anyhow::Context;
-use serde::Deserialize;
 use sqlx::{Executor, PgPool};
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
 #[derive(thiserror::Error)]
 pub enum PublishError {
+    #[error("{0}")]
+    ValidationError(String),
+
     #[error("Authentication failed")]
     AuthError(#[source] anyhow::Error),
+
     #[error("Invalid request: {0}")]
     BadRequest(#[source] anyhow::Error),
+
     #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),
 }
@@ -29,24 +34,14 @@ impl std::fmt::Debug for PublishError {
 impl ResponseError for PublishError {
     fn error_response(&self) -> HttpResponse {
         let status_code = match self {
-            PublishError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            PublishError::ValidationError(_) => StatusCode::BAD_REQUEST,
             PublishError::AuthError(_) => StatusCode::UNAUTHORIZED,
             PublishError::BadRequest(_) => StatusCode::BAD_REQUEST,
+            PublishError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
         build_error_response(status_code, self.to_string())
     }
-}
-
-#[derive(Deserialize)]
-pub struct NewsLetterData {
-    title: String,
-    content: Content,
-}
-#[derive(Deserialize)]
-pub struct Content {
-    html: String,
-    text: String,
 }
 
 #[tracing::instrument(
@@ -60,6 +55,11 @@ pub async fn publish_newsletter(
     user_id: web::ReqData<UserId>,
 ) -> Result<HttpResponse, PublishError> {
     let user_id = user_id.into_inner();
+
+    let newsletter: Newsletter = payload
+        .0
+        .try_into()
+        .map_err(PublishError::ValidationError)?;
 
     let idempotency_key = req
         .headers()
@@ -81,9 +81,9 @@ pub async fn publish_newsletter(
 
     let issue_id = insert_newsletter_issue(
         &mut transaction,
-        &payload.title,
-        &payload.content.text,
-        &payload.content.html,
+        newsletter.title.as_ref(),
+        newsletter.content.text.as_ref(),
+        newsletter.content.html.as_ref(),
     )
     .await?;
 

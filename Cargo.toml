@@ -44,6 +44,8 @@ argon2 = { version = "0.5", features = ["std"] }
 actix-session = { version = "0.10", features = ["redis-session-rustls"] }
 chrono = { version = "0.4", features = ["serde"] }
 proptest = "1.9.0"
+html5ever = "0.27"
+markup5ever_rcdom = "0.3"
 
 [dev-dependencies]
 proptest = "1.9.0"
