@@ -24,6 +24,7 @@ pub struct PostRecord {
     pub liked_by: Option<Vec<Uuid>>,
     pub created_by: Uuid,
     pub created_at: DateTime<Utc>,
+    pub created_by_name: String,
 }
 
 #[derive(serde::Serialize)]
@@ -35,6 +36,7 @@ pub struct PostResponse {
     pub version: i32,
     pub created_at: DateTime<Utc>,
     pub created_by: Uuid,
+    created_by_name: String,
     #[serde(default)]
     pub liked_by: Vec<Uuid>,
 }
@@ -49,6 +51,7 @@ impl From<PostRecord> for PostResponse {
             version: record.version,
             created_at: record.created_at,
             created_by: record.created_by,
+            created_by_name: record.created_by_name,
             liked_by: record.liked_by.unwrap_or_default(),
         }
     }

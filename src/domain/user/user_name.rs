@@ -82,7 +82,8 @@ mod tests {
         #[test]
         fn names_without_forbidden_chars_and_valid_length_are_accepted(
             // Generate strings with safe characters only
-            name in r"[a-zA-Z0-9 _.@#$%&*+=!?,:;'-]{1,256}"
+            // Use a pattern that doesn't allow leading/trailing spaces
+            name in r"[a-zA-Z0-9_.@#$%&*+=!?,:;'-][a-zA-Z0-9 _.@#$%&*+=!?,:;'-]{0,254}[a-zA-Z0-9_.@#$%&*+=!?,:;'-]"
         ) {
             prop_assert!(UserName::parse(name).is_ok());
         }
@@ -113,9 +114,29 @@ mod tests {
         }
 
         #[test]
+        fn names_with_leading_or_trailing_spaces_are_trimmed_and_accepted_if_valid(
+            // Test names with spaces that become valid after trimming
+            prefix_spaces in r"\s{0,5}",
+            core_name in r"[a-zA-Z0-9_.@#$%&*+=!?,:;'-]{1,20}",
+            suffix_spaces in r"\s{0,5}"
+        ) {
+            let name = format!("{}{}{}", prefix_spaces, core_name, suffix_spaces);
+            let result = UserName::parse(name);
+            // After trimming, the core name should be valid
+            prop_assert!(result.is_ok());
+        }
+
+        #[test]
         fn names_with_unicode_in_valid_range_are_handled_correctly(
             // Generate strings with various Unicode characters
+            // Ensure no leading/trailing whitespace
             name in prop::collection::vec(any::<char>(), 1..=256)
+                .prop_filter(
+                    "No leading/trailing whitespace",
+                    |chars| !chars.is_empty() &&
+                            !chars.first().unwrap().is_whitespace() &&
+                            !chars.last().unwrap().is_whitespace()
+                )
                 .prop_map(|chars| chars.into_iter().collect::<String>())
         ) {
             let result = UserName::parse(name.clone());

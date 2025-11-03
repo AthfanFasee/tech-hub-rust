@@ -163,9 +163,10 @@ pub async fn get_post(
 async fn get_post_by_id(id: Uuid, pool: &PgPool) -> Result<PostResponse, PostError> {
     let record = sqlx::query_as::<_, PostRecord>(
         r#"
-        SELECT 0::BIGINT as total_count, id, title, post_text, img, version, liked_by, created_by, created_at
-        FROM posts
-        WHERE id = $1 AND deleted_at IS NULL
+        SELECT 0::BIGINT as total_count, p.id, p.title, p.post_text, p.img, p.version, p.liked_by, p.created_by, p.created_at, u.user_name as created_by_name
+        FROM posts p
+        INNER JOIN users u ON p.created_by = u.id
+        WHERE p.id = $1 AND deleted_at IS NULL
         "#,
     )
         .bind(id)
