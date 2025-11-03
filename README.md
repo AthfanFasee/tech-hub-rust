@@ -1,23 +1,25 @@
 # TechHub
 
-A Rust-idiomatic, production-grade platform powered by Actix Web and PostgreSQL. Built with TDD and comprehensive
-property-based unit tests, fuzzing, and end-to-end black-box integration tests.
+TechHub is a **Rust-idiomatic, production-grade platform** powered by **Actix Web** and **PostgreSQL**. Built with **TDD
+** and comprehensive **property-based unit tests, fuzzing, and end-to-end black-box integration tests**.
 
-TechHub offers post creation with full-text search and pagination, comments, likes, and admin-driven newsletters powered
-by background workers for async and idempotent email delivery.
+Offers post creation with **full-text search and pagination**, comments, likes, and admin-driven newsletters to users
+powered by **background workers** for **async and idempotent email delivery**.
 
-Implements hexagonal architecture and domain modeling with compile-time validation via Rust's type system. Features a
-full authentication system including user registration, login, transactional email confirmation, secure password reset,
-and token-based session authentication.
+Implements **hexagonal architecture** and **domain modeling** with **compile-time validation** via Rust’s type system.
+Features a full authentication system including user registration, login, transactional email confirmation, secure
+password reset, and token-based session authentication, built on **concurrency and distributed-systems-safe transactions
+** under strict **Postgres isolation guarantees**.
 
-## 🛠 Tech Stack
+Delivers full-fledged **telemetry** with tracing spans, performance metrics, and error handling at the right level of
+abstraction. Deployed using **multi-stage Docker builds** on **AWS ECS** with **RDS** and **ElastiCache (Redis)** for
+reliable, scalable operation.
 
-- **Backend**: Rust, Actix Web, Tokio
-- **Database**: PostgreSQL with full-text search
-- **Cache**: Redis
-- **Testing**: Property-based tests, end-to-end tests, fuzzing
-- **Deployment**: Docker, AWS ECS, RDS, ElastiCache
-- **Monitoring**: Tracing, metrics, structured logging
+## 🛠 Core Technologies & Skills
+
+* **Languages & Frameworks**: Rust, Actix Web, Bash
+* **Database & Cache**: PostgreSQL, Redis
+* **DevOps & Cloud**: Docker, Amazon Web Services (AWS)
 
 ## 🏗 Architecture & Design
 
@@ -27,9 +29,9 @@ The application is structured around the **domain logic**, ensuring the core bus
 of external concerns like databases or web frameworks.
 
 * **Application Layer**: Handles I/O and orchestration (e.g., **HTTP Handlers**, **Background Workers**).
-  $\downarrow$
+
 * **Domain Layer**: Contains the core business logic (e.g., **Entities**, **Value Objects**, **Business Rules**).
-  $\downarrow$
+
 * **Infrastructure Layer**: Handles external dependencies (e.g., **Database**, **Email**, **Cache**).
 
 ### **Domain-Driven Design (DDD) Principles**
