@@ -6,7 +6,23 @@ impl Img {
         let trimmed = s.trim();
 
         if trimmed.is_empty() {
-            return Err("Invalid image URL/path: cannot be empty.".to_string());
+            return Err("Invalid image URL: cannot be empty.".to_string());
+        }
+
+        // Must be a valid HTTPS URL
+        if !trimmed.starts_with("https://") {
+            return Err("Invalid image URL: must be a valid HTTP or HTTPS URL.".to_string());
+        }
+
+        // Validate reasonable length for URLs
+        if trimmed.len() > 2048 {
+            return Err("Invalid image URL: cannot be longer than 2048 characters.".to_string());
+        }
+
+        // URLs should not contain certain characters
+        let forbidden_chars = ['\0', '\n', '\r', '\t', ' '];
+        if trimmed.chars().any(|c| forbidden_chars.contains(&c)) {
+            return Err("Invalid image URL: contains forbidden characters.".to_string());
         }
 
         Ok(Self(trimmed.to_string()))

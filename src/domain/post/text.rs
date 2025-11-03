@@ -9,6 +9,10 @@ impl Text {
             return Err("Invalid text: cannot be empty.".to_string());
         }
 
+        if trimmed.len() > 10_000 {
+            return Err("Invalid text: cannot be longer than 10,000 characters.".to_string());
+        }
+
         Ok(Self(trimmed.to_string()))
     }
 }

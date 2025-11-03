@@ -1,3 +1,5 @@
+use unicode_segmentation::UnicodeSegmentation;
+
 #[derive(Debug)]
 pub struct Title(String);
 
@@ -9,8 +11,18 @@ impl Title {
             return Err("Invalid title: cannot be empty.".to_string());
         }
 
-        if trimmed.len() > 100 {
-            return Err("Invalid title: cannot exceed 100 characters.".to_string());
+        let grapheme_count = trimmed.graphemes(true).count();
+
+        if grapheme_count > 100 {
+            return Err("Invalid title: cannot be longer than 100 characters.".to_string());
+        }
+
+        // Check if title contains only digits
+        let has_non_numeric = trimmed
+            .chars()
+            .any(|c| !c.is_numeric() && !c.is_whitespace());
+        if !has_non_numeric {
+            return Err("Invalid title: cannot contain only numbers.".to_string());
         }
 
         Ok(Self(trimmed.to_string()))
