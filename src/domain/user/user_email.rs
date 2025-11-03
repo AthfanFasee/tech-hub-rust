@@ -50,9 +50,11 @@ mod tests {
     use claims::assert_err;
     use fake::Fake;
     use fake::faker::internet::en::SafeEmail;
+    use proptest::prelude::*;
     use rand::SeedableRng;
     use rand::rngs::StdRng;
 
+    // Example-based tests for specific edge cases
     #[test]
     fn empty_string_is_rejected() {
         let email = "".to_string();
@@ -71,24 +73,34 @@ mod tests {
         assert_err!(UserEmail::parse(email));
     }
 
-    // A wrapper around a valid email string for testing
-    #[derive(Debug, Clone)]
-    struct ValidEmailFixture(pub String);
-
-    // Implement Arbitrary so QuickCheck can generate random ValidEmailFixture values
-    impl quickcheck::Arbitrary for ValidEmailFixture {
-        fn arbitrary(g: &mut quickcheck::Gen) -> Self {
-            // Create a deterministic random number generator
-            let mut rng = StdRng::seed_from_u64(u64::arbitrary(g));
-            // Generate a realistic fake email address
-            let email = SafeEmail().fake_with_rng(&mut rng);
-            Self(email)
-        }
+    // Property-based tests
+    // Define a strategy for generating valid emails
+    fn valid_email_strategy() -> impl Strategy<Value = String> {
+        // Generate values deterministically based on the test seed
+        (0u64..1000u64).prop_map(|seed| {
+            let mut rng = StdRng::seed_from_u64(seed);
+            SafeEmail().fake_with_rng(&mut rng)
+        })
     }
 
-    // Property-based test: randomly generated valid emails should parse successfully
-    #[quickcheck_macros::quickcheck]
-    fn valid_emails_are_parsed_successfully(valid_email: ValidEmailFixture) -> bool {
-        UserEmail::parse(valid_email.0).is_ok()
+    proptest! {
+        #[test]
+        fn valid_emails_are_parsed_successfully(email in valid_email_strategy()) {
+            prop_assert!(UserEmail::parse(email).is_ok());
+        }
+
+        #[test]
+        fn empty_strings_are_rejected(whitespace in r"\s*") {
+            prop_assert!(UserEmail::parse(whitespace).is_err());
+        }
+
+        #[test]
+        fn emails_without_at_are_rejected(
+            local in "[a-z]{1,10}",
+            domain in "[a-z]{1,10}"
+        ) {
+            let email = format!("{}{}", local, domain);
+            prop_assert!(UserEmail::parse(email).is_err());
+        }
     }
 }
