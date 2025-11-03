@@ -94,6 +94,12 @@ make fuzz-intensive
 make fuzz-coverage name=fuzz_user_email
 ```
 
+---
+
+### Tests
+
 ![TechHub Test Suite Logo](./assets/tests.png)
+
+### Error Logs
 
 ![TechHub Error Logs Logo](./assets/error_logs.png)
