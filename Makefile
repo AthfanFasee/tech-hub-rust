@@ -46,7 +46,7 @@ security-audit-full: security-audit test
 	@echo ""
 	@echo "=========================================="
 	@echo "Running full security audit with fuzzing"
-	@echo "Estimated time: ~10 minutes"
+	@echo "Estimated time: ~15 minutes"
 	@echo "=========================================="
 	@$(MAKE) fuzz
 	@echo ""
@@ -214,7 +214,7 @@ init-fuzz-corpus:
 fuzz: ensure-nightly init-fuzz-corpus
 	@echo "=========================================="
 	@echo "WARNING: Long-running operation"
-	@echo "Estimated time: ~5 minutes"
+	@echo "Estimated time: ~10 minutes"
 	@echo "=========================================="
 	@echo "Running all fuzzing domains using nightly toolchain..."
 	@CARGO='/usr/bin/env cargo +nightly' ./scripts/fuzz/fuzz_authentication.sh
@@ -258,7 +258,7 @@ fuzz-domain: ensure-nightly init-fuzz-corpus
 fuzz-intensive: ensure-nightly init-fuzz-corpus
 	@echo "=========================================="
 	@echo "WARNING: Very long-running operation"
-	@echo "Estimated time: ~25 minutes"
+	@echo "Estimated time: ~40 minutes"
 	@echo "=========================================="
 	@echo "Running intensive fuzzing (300s per fuzzer)..."
 	@DURATION=300 CARGO='/usr/bin/env cargo +nightly' ./scripts/fuzz/fuzz_authentication.sh
