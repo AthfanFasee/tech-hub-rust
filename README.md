@@ -93,3 +93,7 @@ make fuzz-intensive
 # Generate coverage reports
 make fuzz-coverage name=fuzz_user_email
 ```
+
+![TechHub Test Suite Logo](./assets/tests.png)
+
+![TechHub Error Logs Logo](./assets/error_logs.png)
