@@ -90,6 +90,12 @@ test-single: lint
 	@echo "Running cargo test for '$(name)' with bunyan formatted logs in debug mode..."
 	@export RUST_LOG="sqlx=error,debug" && export TEST_LOG=true && cargo test --all-targets $(name) -- --nocapture | bunyan
 
+# Test release command: runs tests in release mode
+test-release: lint
+	@echo "Running cargo test in release mode (skipping doc-tests)"
+	@unset RUST_LOG && unset TEST_LOG && cargo test --release --all-targets
+	@echo "Release mode test completed!"
+
 
 
 # ==================================================================================== #
