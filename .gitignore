@@ -1,3 +1,5 @@
 /target
 !.sqlx/
 !.sqlx/**
+.idea/
+*.iml

@@ -1,5 +1,5 @@
 use crate::authentication::compute_password_hash;
-use crate::domain::{NewUser, UserEmail, UserName, UserPassword};
+use crate::domain::{NewUser, UserData, UserEmail, UserName, UserPassword};
 use crate::email_client::EmailClient;
 use crate::email_client::EmailError;
 use crate::startup::ApplicationBaseUrl;
@@ -10,8 +10,7 @@ use actix_web::ResponseError;
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, web};
 use anyhow::Context;
-use secrecy::{ExposeSecret, Secret};
-use serde::Deserialize;
+use secrecy::ExposeSecret;
 use sqlx::{Executor, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
@@ -42,34 +41,11 @@ impl ResponseError for UserRegisterError {
     }
 }
 
-#[derive(Deserialize)]
-pub struct UserData {
-    email: String,
-    user_name: String,
-    password: Secret<String>,
-}
-
-// This is like saying - I know how to build myself `NewUser` from something else `UserData`
-// Then Rust lets us use `.try_into` whenever there's a `UserData` - where it automatically tries converting it to a `NewUser`
-impl TryFrom<UserData> for NewUser {
-    type Error = String;
-
-    fn try_from(payload: UserData) -> Result<Self, Self::Error> {
-        let user_name = UserName::parse(payload.user_name)?;
-        let email = UserEmail::parse(payload.email)?;
-        let password = UserPassword::parse(payload.password.expose_secret().to_string())?;
-        Ok(Self {
-            user_name,
-            email,
-            password,
-        })
-    }
-}
 #[tracing::instrument(
     skip_all,
     fields(
-        user_email = %payload.email,
-        user_name = %payload.user_name,
+        user_name = tracing::field::Empty,
+        user_email = tracing::field::Empty
     )
 )]
 pub async fn register_user(
@@ -87,6 +63,9 @@ pub async fn register_user(
         .0
         .try_into()
         .map_err(UserRegisterError::ValidationError)?;
+
+    tracing::Span::current().record("user_name", tracing::field::display(&name));
+    tracing::Span::current().record("user_email", tracing::field::display(&email));
 
     let mut transaction = pool
         .begin()
