@@ -1,4 +1,18 @@
 # ==================================================================================== #
+# PHONY DECLARATIONS
+# ==================================================================================== #
+
+.PHONY: \
+	lint security-audit audit security-audit-full audit-full \
+	run run-full run-scratch \
+	test test-full test-log test-log-debug test-single test-release \
+	migrate-add migrate migrate-new \
+	fuzz fuzz-single fuzz-domain fuzz-intensive fuzz-coverage fuzz-clean \
+	redis
+
+
+
+# ==================================================================================== #
 # QUALITY CONTROL
 # ==================================================================================== #
 
@@ -26,6 +40,23 @@ security-audit:
 # Full audit command: runs security audit and tests
 audit: security-audit test
 	@echo "Full audit completed successfully!"
+
+# Security audit full command: runs security audit, tests, and fuzz
+security-audit-full: security-audit test
+	@echo ""
+	@echo "=========================================="
+	@echo "Running full security audit with fuzzing"
+	@echo "Estimated time: ~10 minutes"
+	@echo "=========================================="
+	@$(MAKE) fuzz
+	@echo ""
+	@echo "=========================================="
+	@echo "Full security audit completed successfully!"
+	@echo "=========================================="
+
+# Full audit with fuzz: runs security audit, tests, and fuzz
+audit-full: security-audit-full
+	@echo "Full audit with fuzzing completed successfully!"
 
 
 
@@ -126,6 +157,104 @@ migrate-new:
 	./scripts/init_db.sh
 	@echo "Running cargo sqlx prepare..."
 	cargo sqlx prepare
+
+
+
+# ==================================================================================== #
+# FUZZING
+# ==================================================================================== #
+
+# Ensure nightly exists (silent if already installed)
+ensure-nightly:
+	@rustup toolchain list | grep nightly > /dev/null || rustup toolchain install nightly
+
+# Initialize corpus: runs the corpus setup script (this ensures the corpus files are created)
+# Usage: make init-fuzz-corpus
+init-fuzz-corpus:
+	@echo "=========================================="
+	@echo "Initializing fuzz corpus..."
+	@echo "=========================================="
+	@./scripts/fuzz/setup_fuzz_corpus.sh
+
+# Fuzz command: runs all fuzz domains with nightly
+fuzz: ensure-nightly init-fuzz-corpus
+	@echo "=========================================="
+	@echo "WARNING: Long-running operation"
+	@echo "Estimated time: ~5 minutes"
+	@echo "=========================================="
+	@echo "Running all fuzzing domains using nightly toolchain..."
+	@CARGO='/usr/bin/env cargo +nightly' ./scripts/fuzz/fuzz_authentication.sh
+	@CARGO='/usr/bin/env cargo +nightly' ./scripts/fuzz/fuzz_posts.sh
+	@CARGO='/usr/bin/env cargo +nightly' ./scripts/fuzz/fuzz_comments.sh
+	@CARGO='/usr/bin/env cargo +nightly' ./scripts/fuzz/fuzz_newsletter.sh
+	@echo ""
+	@echo "=========================================="
+	@echo "All fuzzing completed successfully!"
+	@echo "=========================================="
+
+# Fuzz single command: runs a specific fuzzer target
+# Usage: make fuzz-single name=fuzz_user_email duration=60
+fuzz-single: ensure-nightly init-fuzz-corpus
+	@if [ -z "$(name)" ]; then \
+		echo "Error: please provide a fuzzer name, e.g.:"; \
+		echo "   make fuzz-single name=fuzz_user_email"; \
+		echo "   make fuzz-single name=fuzz_user_email duration=120"; \
+		exit 1; \
+	fi
+	@duration=${duration:-60}; \
+	echo "Running fuzzer '$(name)' for ${duration}s..."; \
+	cargo +nightly fuzz run $(name) -- -max_len=512 -max_total_time=${duration} || echo "Fuzzer found issues (check fuzz/artifacts/)"
+
+# Fuzz domain command: runs all fuzzers for a specific domain
+# Usage: make fuzz-domain name=authentication
+fuzz-domain: ensure-nightly init-fuzz-corpus
+	@if [ -z "$(name)" ]; then \
+		echo "Error: please provide a domain name, e.g.:"; \
+		echo "   make fuzz-domain name=authentication"; \
+		exit 1; \
+	fi
+	@if [ ! -f "./scripts/fuzz_$(name).sh" ]; then \
+		echo "Error: Script './scripts/fuzz_$(name).sh' not found"; \
+		exit 1; \
+	fi
+	@echo "Running fuzzing for $(name) domain..."
+	@CARGO='/usr/bin/env cargo +nightly' ./scripts/fuzz_$(name).sh
+
+# Fuzz intensive command: runs all fuzzers with extended duration (5 minutes each)
+fuzz-intensive: ensure-nightly init-fuzz-corpus
+	@echo "=========================================="
+	@echo "WARNING: Very long-running operation"
+	@echo "Estimated time: ~25 minutes"
+	@echo "=========================================="
+	@echo "Running intensive fuzzing (300s per fuzzer)..."
+	@DURATION=300 CARGO='/usr/bin/env cargo +nightly' ./scripts/fuzz/fuzz_authentication.sh
+	@DURATION=300 CARGO='/usr/bin/env cargo +nightly' ./scripts/fuzz/fuzz_posts.sh
+	@DURATION=300 CARGO='/usr/bin/env cargo +nightly' ./scripts/fuzz/fuzz_comments.sh
+	@DURATION=300 CARGO='/usr/bin/env cargo +nightly' ./scripts/fuzz/fuzz_newsletter.sh
+	@echo ""
+	@echo "=========================================="
+	@echo "Intensive fuzzing completed!"
+	@echo "=========================================="
+
+# Fuzz coverage command: generates coverage report for a fuzzer
+# Usage: make fuzz-coverage name=fuzz_user_email
+fuzz-coverage: ensure-nightly
+	@if [ -z "$(name)" ]; then \
+		echo "Error: please provide a fuzzer name, e.g.:"; \
+		echo "   make fuzz-coverage name=fuzz_user_email"; \
+		exit 1; \
+	fi
+	@echo "Generating coverage report for '$(name)'..."
+	cargo +nightly fuzz coverage $(name)
+	@echo "Opening coverage report..."
+	@open fuzz/coverage/$(name)/index.html || xdg-open fuzz/coverage/$(name)/index.html || echo "Coverage report at: fuzz/coverage/$(name)/index.html"
+
+# Fuzz clean command: removes fuzz artifacts and corpus
+fuzz-clean: ensure-nightly
+	@echo "Cleaning fuzzing artifacts and corpus..."
+	@rm -rf fuzz/artifacts/*
+	@rm -rf fuzz/corpus/*
+	@echo "Fuzzing data cleaned!"
 
 
 

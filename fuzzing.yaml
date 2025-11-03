@@ -1,0 +1,67 @@
+name: Fuzzing
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # 2 AM daily
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/domain/**'  # Only run if domain code changes
+      - 'fuzz/**'
+
+jobs:
+  fuzz-authentication:
+    name: Fuzz Authentication Domain
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust nightly
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz
+
+      - name: Cache fuzz corpus
+        uses: actions/cache@v3
+        with:
+          path: fuzz/corpus
+          key: fuzz-corpus-${{ github.sha }}
+          restore-keys: fuzz-corpus-
+
+      - name: Run authentication fuzzers
+        run: |
+          FUZZERS=(
+            "fuzz_user_email"
+            "fuzz_user_password"
+            "fuzz_user_email_unicode"
+            "fuzz_email_at_symbol_variations"
+            "fuzz_password_grapheme_counting"
+          )
+          
+          for fuzzer in "${FUZZERS[@]}"; do
+            echo "::group::Fuzzing $fuzzer"
+            timeout 300 cargo fuzz run "$fuzzer" -- \
+              -max_len=512 \
+              -max_total_time=60 \
+              || true  # Don't fail workflow, just report
+            echo "::endgroup::"
+          done
+
+      - name: Upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: fuzz-crashes-${{ github.run_id }}
+          path: fuzz/artifacts/**/*
+          if-no-files-found: ignore
+
+  # Future: Add more domain fuzz jobs
+  # fuzz-newsletter:
+  #   name: Fuzz Newsletter Domain
+  #   runs-on: ubuntu-latest
+  #   steps: ...

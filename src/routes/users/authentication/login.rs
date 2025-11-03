@@ -1,11 +1,11 @@
 use crate::authentication::AuthError;
 use crate::authentication::{Credentials, validate_credentials};
+use crate::domain::LoginData;
 use crate::session_state::TypedSession;
 use crate::{build_error_response, error_chain_fmt};
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, ResponseError, web};
 use anyhow::Context;
-use secrecy::Secret;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -34,12 +34,6 @@ impl ResponseError for LoginError {
     }
 }
 
-#[derive(serde::Deserialize)]
-pub struct LoginData {
-    user_name: String,
-    password: Secret<String>,
-}
-
 #[tracing::instrument(
     skip_all,
     fields(user_name=tracing::field::Empty)
@@ -49,12 +43,14 @@ pub async fn login(
     pool: web::Data<PgPool>,
     session: TypedSession,
 ) -> Result<HttpResponse, LoginError> {
-    let credentials = Credentials {
-        user_name: payload.0.user_name,
-        password: payload.0.password,
-    };
+    // Validate payload (returns generic auth error on validation failure)
+    let credentials: Credentials = payload
+        .0
+        .try_into()
+        .map_err(|_| LoginError::AuthError(anyhow::anyhow!("Invalid credentials")))?;
 
     tracing::Span::current().record("user_name", tracing::field::display(&credentials.user_name));
+
     let user_id = validate_credentials(credentials, &pool)
         .await
         .map_err(|e| match e {
@@ -64,7 +60,6 @@ pub async fn login(
 
     let is_admin = is_admin_user(user_id, &pool).await?;
 
-    // prevent session fixation attacks with `session.renew()`
     session.renew();
     session.insert_user_id(user_id)?;
     session.insert_is_admin(is_admin)?;

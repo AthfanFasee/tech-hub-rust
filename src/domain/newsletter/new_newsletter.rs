@@ -133,7 +133,7 @@ mod tests {
 
     #[test]
     fn malformed_html_with_unclosed_tags_is_accepted() {
-        // scraper is permissive and will parse this, auto-closing tags
+        // html5ever is a forgiving HTML5 parser. It automatically closes unclosed tags
         let result = Newsletter::new(
             "Valid Title".into(),
             "<p>Content without closing tag".into(),
