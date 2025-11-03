@@ -73,6 +73,12 @@ mod tests {
 
     #[test]
     fn a_valid_name_is_parsed_successfully() {
+        let name = "AthfanFasee".to_string();
+        assert_ok!(UserName::parse(name));
+    }
+
+    #[test]
+    fn a_valid_name_with_space_in_middle_is_parsed_successfully() {
         let name = "Athfan Fasee".to_string();
         assert_ok!(UserName::parse(name));
     }
