@@ -10,14 +10,6 @@ Implements hexagonal architecture and domain modeling with compile-time validati
 full authentication system including user registration, login, transactional email confirmation, secure password reset,
 and token-based session authentication.
 
-## 🚀 Features
-
-- **Authentication System**: User registration, email confirmation, password reset
-- **Content Management**: Posts with full-text search, comments, and likes
-- **Newsletter System**: Admin-driven newsletters with background email delivery
-- **Production Ready**: Tracing, metrics, error handling, and Docker deployment
-- **Security Focused**: Property-based testing and fuzzing for critical paths
-
 ## 🛠 Tech Stack
 
 - **Backend**: Rust, Actix Web, Tokio
