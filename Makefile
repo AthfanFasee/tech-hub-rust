@@ -127,6 +127,24 @@ test-release: lint
 	@unset RUST_LOG && unset TEST_LOG && cargo test --release --all-targets
 	@echo "Release mode test completed!"
 
+# Test stress command: runs only unit tests 30 times to stress-test property-based tests
+unit-test-stress: lint
+	@echo "Running unit tests 30 times to stress-test property-based tests..."
+	@for i in $$(seq 1 30); do \
+		echo "=== Unit test run $$i/30 ==="; \
+		unset RUST_LOG && unset TEST_LOG && cargo test --lib || exit 1; \
+	done
+	@echo "Unit stress test completed! All 30 runs passed."
+
+# Test stress with logging command: runs unit tests 30 times with bunyan logging
+unit-test-stress-log: lint
+	@echo "Running unit tests 30 times with bunyan logging..."
+	@for i in $$(seq 1 30); do \
+		echo "=== Unit test run $$i/30 ==="; \
+		export RUST_LOG="sqlx=error,info,error" && export TEST_LOG=true && cargo test --lib | bunyan || exit 1; \
+	done
+	@echo "Unit stress test with logging completed! All 30 runs passed."
+
 
 
 # ==================================================================================== #
