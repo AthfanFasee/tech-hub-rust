@@ -1,7 +1,7 @@
 # TechHub
 
 A Rust-idiomatic, production-grade platform powered by Actix Web and PostgreSQL. Built with TDD and comprehensive
-end-to-end black-box tests.
+property-based unit tests, fuzzing, and end-to-end black-box integration tests.
 
 TechHub offers post creation with full-text search and pagination, comments, likes, and admin-driven newsletters powered
 by background workers for async and idempotent email delivery.
