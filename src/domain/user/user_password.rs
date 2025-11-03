@@ -36,7 +36,10 @@ impl UserPassword {
 mod tests {
     use crate::domain::UserPassword;
     use claims::{assert_err, assert_ok};
+    use proptest::prelude::*;
+    use unicode_segmentation::UnicodeSegmentation;
 
+    // Example-based tests
     #[test]
     fn passwords_shorter_than_8_graphemes_are_rejected() {
         let password = "1234567".to_string();
@@ -77,5 +80,54 @@ mod tests {
     fn a_128_grapheme_password_is_valid() {
         let password = "x".repeat(128);
         assert_ok!(UserPassword::parse(password));
+    }
+
+    // Property-based tests
+    proptest! {
+        #[test]
+        fn passwords_with_valid_length_are_accepted(
+            password in "[a-zA-Z0-9]{8,128}"
+        ) {
+            prop_assert!(UserPassword::parse(password).is_ok());
+        }
+
+        #[test]
+        fn passwords_shorter_than_8_chars_are_rejected(
+            password in "[a-zA-Z0-9]{1,7}"
+        ) {
+            prop_assert!(UserPassword::parse(password).is_err());
+        }
+
+        #[test]
+        fn passwords_longer_than_128_chars_are_rejected(
+            password in "[a-zA-Z0-9]{129,200}"
+        ) {
+            prop_assert!(UserPassword::parse(password).is_err());
+        }
+
+        #[test]
+        fn whitespace_only_passwords_of_any_length_are_rejected(
+            password in r"\s{1,200}"
+        ) {
+            prop_assert!(UserPassword::parse(password).is_err());
+        }
+
+        #[test]
+        fn passwords_with_unicode_in_valid_range_are_accepted(
+            // Generate strings with various Unicode characters
+            password in prop::collection::vec(any::<char>(), 8..=128)
+                .prop_map(|chars| chars.into_iter().collect::<String>())
+        ) {
+            // This tests that our grapheme counting works correctly
+            // with various Unicode characters including emoji, combining marks, etc.
+            let result = UserPassword::parse(password.clone());
+            let grapheme_count = password.trim().graphemes(true).count();
+
+            if (8..=128).contains(&grapheme_count) && !password.trim().is_empty() {
+                prop_assert!(result.is_ok());
+            } else {
+                prop_assert!(result.is_err());
+            }
+        }
     }
 }
