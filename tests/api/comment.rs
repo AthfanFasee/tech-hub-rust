@@ -3,6 +3,10 @@ use serde_json::json;
 use sqlx::query;
 use uuid::Uuid;
 
+// ============================================================================
+// Create Comment
+// ============================================================================
+
 #[tokio::test]
 async fn create_comment_returns_201_for_valid_input() {
     let app = spawn_app().await;
@@ -88,6 +92,10 @@ async fn create_comment_returns_401_if_unauthenticated() {
     );
 }
 
+// ============================================================================
+// Get Comments
+// ============================================================================
+
 #[tokio::test]
 async fn show_comments_for_post_returns_200_and_list() {
     let app = spawn_app().await;
@@ -134,55 +142,9 @@ async fn show_comments_returns_empty_array_for_post_with_no_comments() {
     assert!(body["comments"].as_array().unwrap().is_empty());
 }
 
-#[tokio::test]
-async fn delete_comment_removes_comment_successfully() {
-    let app = spawn_app().await;
-    app.login().await;
-
-    let post_id = app.create_sample_post().await;
-
-    let payload = json!({
-        "text": "To be deleted",
-        "post_id": post_id.to_string()
-    });
-    let resp = app.create_comment(&payload).await;
-    assert_eq!(resp.status().as_u16(), 201);
-
-    let body: serde_json::Value = resp.json().await.unwrap();
-    let comment_id = Uuid::parse_str(body["id"].as_str().unwrap()).unwrap();
-
-    let response = app.delete_comment(&comment_id).await;
-    assert_eq!(
-        response.status().as_u16(),
-        200,
-        "Expected 200 OK when deleting existing comment"
-    );
-
-    let record = query!(
-        "SELECT COUNT(*) AS count FROM comments WHERE id = $1",
-        comment_id
-    )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Failed to check DB for deleted comment");
-
-    assert_eq!(record.count.unwrap(), 0);
-}
-
-#[tokio::test]
-async fn delete_comment_returns_404_for_nonexistent_comment() {
-    let app = spawn_app().await;
-    app.login().await;
-
-    let random_id = Uuid::new_v4();
-    let response = app.delete_comment(&random_id).await;
-
-    assert_eq!(
-        response.status().as_u16(),
-        404,
-        "Expected 404 for deleting non-existing comment"
-    );
-}
+// ============================================================================
+// Delete Comment
+// ============================================================================
 
 #[tokio::test]
 async fn delete_comment_returns_401_if_unauthenticated() {
@@ -204,8 +166,119 @@ async fn delete_comment_returns_401_if_unauthenticated() {
     let response = app.delete_comment(&comment_id).await;
 
     assert_eq!(
-        response.status().as_u16(),
         401,
+        response.status().as_u16(),
         "Expected 401 for unauthenticated comment delete"
+    );
+}
+
+#[tokio::test]
+async fn comment_can_only_be_deleted_by_creator_or_admin() {
+    let app = spawn_app().await;
+    app.login().await;
+
+    let post_id = app.create_sample_post().await;
+
+    // User A creates comment
+    let payload = json!({
+        "text": "Comment A",
+        "post_id": post_id.to_string()
+    });
+    let resp = app.create_comment(&payload).await;
+    let body: serde_json::Value = resp.json().await.unwrap();
+    let comment_id = Uuid::parse_str(body["id"].as_str().unwrap()).unwrap();
+    app.logout().await;
+
+    // User B logs in and tries to delete (should fail with 403)
+    let user_b = app.create_activated_user().await;
+    app.login_with(&user_b).await;
+
+    let response = app.delete_comment(&comment_id).await;
+    assert_eq!(
+        403,
+        response.status().as_u16(),
+        "Expected 403 Forbidden when non-creator tries to delete comment"
+    );
+
+    // Admin logs in and deletes (should succeed)
+    app.login_admin().await;
+
+    let response = app.delete_comment(&comment_id).await;
+    assert_eq!(
+        200,
+        response.status().as_u16(),
+        "Expected 200 OK when admin deletes comment"
+    );
+
+    let record = query!(
+        "SELECT COUNT(*) AS count FROM comments WHERE id = $1",
+        comment_id
+    )
+    .fetch_one(&app.db_pool)
+    .await
+    .expect("Failed to check DB");
+
+    assert_eq!(record.count.unwrap(), 0, "Comment should be deleted");
+}
+
+#[tokio::test]
+async fn delete_comment_removes_comment_successfully() {
+    let app = spawn_app().await;
+    app.login().await;
+
+    let post_id = app.create_sample_post().await;
+
+    let payload = json!({
+        "text": "To be deleted",
+        "post_id": post_id.to_string()
+    });
+    let resp = app.create_comment(&payload).await;
+    assert_eq!(resp.status().as_u16(), 201);
+
+    let body: serde_json::Value = resp.json().await.unwrap();
+    let comment_id = Uuid::parse_str(body["id"].as_str().unwrap()).unwrap();
+
+    let response = app.delete_comment(&comment_id).await;
+    assert_eq!(response.status().as_u16(), 200);
+
+    let record = query!(
+        "SELECT COUNT(*) AS count FROM comments WHERE id = $1",
+        comment_id
+    )
+    .fetch_one(&app.db_pool)
+    .await
+    .expect("Failed to check DB");
+
+    assert_eq!(record.count.unwrap(), 0);
+}
+
+#[tokio::test]
+async fn delete_comment_returns_404_for_nonexistent_comment_when_authorized() {
+    let app = spawn_app().await;
+    app.login_admin().await;
+
+    let random_id = Uuid::new_v4();
+    let response = app.delete_comment(&random_id).await;
+
+    assert_eq!(
+        response.status().as_u16(),
+        404,
+        "Expected 404 when an authorized user attempts to delete a non-existing comment"
+    );
+}
+
+#[tokio::test]
+async fn delete_comment_does_not_leak_existence_information() {
+    let app = spawn_app().await;
+    let random_comment = Uuid::new_v4();
+
+    let user_b = app.create_activated_user().await;
+    app.login_with(&user_b).await;
+
+    let response = app.delete_comment(&random_comment).await;
+    assert_eq!(
+        403,
+        response.status().as_u16(),
+        "Expected 403 forbidden (not 404) for unauthorized delete attempt"
     );
 }

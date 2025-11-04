@@ -95,5 +95,6 @@ pub async fn reject_non_admin_users(
     }
 
     req.extensions_mut().insert(UserId(user_id));
+    req.extensions_mut().insert(IsAdmin(is_admin));
     next.call(req).await
 }
