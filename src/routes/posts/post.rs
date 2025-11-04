@@ -267,9 +267,23 @@ pub async fn update_post(
     payload: web::Json<UpdatePostPayload>,
     pool: web::Data<PgPool>,
     user_id: web::ReqData<UserId>,
+    is_admin: web::ReqData<IsAdmin>,
 ) -> Result<HttpResponse, PostError> {
     let post_id = path.id;
-    tracing::Span::current().record("user_id", tracing::field::display(&*user_id.into_inner()));
+    let user_id = user_id.into_inner();
+    let is_admin = *is_admin.into_inner();
+
+    tracing::Span::current().record("user_id", tracing::field::display(&user_id));
+
+    // If not admin, verify ownership
+    if !is_admin {
+        let is_owner = did_user_create_the_post(post_id, *user_id, &pool).await?;
+
+        if !is_owner {
+            return Err(PostError::Forbidden);
+        }
+    }
+
     let validated_post: Post = payload.0.try_into().map_err(PostError::ValidationError)?;
     let mut post = get_post_by_id(post_id, &pool).await?;
 
