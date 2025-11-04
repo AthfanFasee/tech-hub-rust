@@ -1,4 +1,4 @@
-use crate::helpers::{ConfirmationLinks, TestApp, TestUser, spawn_app};
+use crate::helpers::spawn_app;
 use std::time::Duration;
 use techhub::newsletter_delivery_worker::cleanup_old_newsletter_issues;
 use uuid::Uuid;
@@ -8,7 +8,7 @@ use wiremock::{Mock, ResponseTemplate};
 #[tokio::test]
 async fn newsletters_are_not_delivered_to_inactivated_user() {
     let app = spawn_app().await;
-    create_inactivated_user(&app).await;
+    app.create_inactivated_user().await;
     app.login_admin().await;
 
     Mock::given(any())
@@ -35,7 +35,7 @@ async fn newsletters_are_not_delivered_to_inactivated_user() {
 #[tokio::test]
 async fn newsletters_are_not_delivered_to_confirmed_but_unsubscribed_users() {
     let app = spawn_app().await;
-    create_activated_user(&app).await;
+    app.create_activated_user().await;
     app.login_admin().await;
 
     Mock::given(path("/email"))
@@ -361,7 +361,7 @@ async fn anonymous_users_cannot_publish_newsletters() {
 #[tokio::test]
 async fn newsletters_are_delivered_to_a_user_who_subscribed_via_the_full_flow() {
     let app = spawn_app().await;
-    create_active_subscriber(&app).await;
+    app.create_active_subscriber().await;
     app.login_admin().await;
 
     Mock::given(path("/email"))
@@ -389,7 +389,7 @@ async fn newsletters_are_delivered_to_a_user_who_subscribed_via_the_full_flow() 
 #[tokio::test]
 async fn newsletter_publishing_is_idempotent() {
     let app = spawn_app().await;
-    create_active_subscriber(&app).await;
+    app.create_active_subscriber().await;
     app.login_admin().await;
 
     Mock::given(path("/email"))
@@ -420,7 +420,7 @@ async fn newsletter_publishing_is_idempotent() {
 #[tokio::test]
 async fn concurrent_newsletter_publishing_is_handled_gracefully() {
     let app = spawn_app().await;
-    create_active_subscriber(&app).await;
+    app.create_active_subscriber().await;
     app.login_admin().await;
 
     Mock::given(path("/email"))
@@ -458,7 +458,7 @@ async fn concurrent_newsletter_publishing_is_handled_gracefully() {
 #[tokio::test]
 async fn failed_newsletter_delivery_is_retried_with_back_off() {
     let app = spawn_app().await;
-    create_active_subscriber(&app).await;
+    app.create_active_subscriber().await;
     app.login_admin().await;
 
     Mock::given(path("/email"))
@@ -575,76 +575,4 @@ async fn old_newsletter_issues_are_cleaned_up() {
     .unwrap()
     .unwrap();
     assert!(new_exists, "Recent newsletter issue was wrongly deleted");
-}
-
-async fn create_inactivated_user(app: &TestApp) -> (serde_json::Value, ConfirmationLinks) {
-    let user = TestUser::generate();
-    let payload = serde_json::json!({
-        "user_name": user.user_name,
-        "email": user.email,
-        "password": user.password,
-    });
-
-    let _mock_guard = Mock::given(path("/email"))
-        .and(method("POST"))
-        .respond_with(ResponseTemplate::new(200))
-        .named("Create inactivated user")
-        .expect(1)
-        .mount_as_scoped(&app.email_server)
-        .await;
-
-    app.register_user(&payload)
-        .await
-        .error_for_status()
-        .unwrap();
-
-    let email_request = &app
-        .email_server
-        .received_requests()
-        .await
-        .unwrap()
-        .pop()
-        .unwrap();
-
-    let confirmation_links = app.get_confirmation_links(email_request);
-    (payload, confirmation_links)
-}
-
-async fn create_activated_user(app: &TestApp) -> serde_json::Value {
-    let (payload, confirmation_link) = create_inactivated_user(app).await;
-    reqwest::get(confirmation_link.html)
-        .await
-        .unwrap()
-        .error_for_status()
-        .unwrap();
-    payload
-}
-
-pub async fn create_active_subscriber(app: &TestApp) {
-    let payload = create_activated_user(app).await;
-
-    let response = app.login_with(&payload).await;
-    assert_eq!(response.status().as_u16(), 200);
-
-    let _mock_guard = Mock::given(path("/email"))
-        .and(method("POST"))
-        .respond_with(ResponseTemplate::new(200))
-        .named("Subscription confirmation email")
-        .expect(1)
-        .mount_as_scoped(&app.email_server)
-        .await;
-
-    app.send_subscribe_email().await;
-
-    // Stimulate that user will be clicking confirmation email outside our app by logging out
-    app.logout().await;
-
-    // Extract confirmation link from subscription email and "click" it
-    let email_request = &app.email_server.received_requests().await.unwrap()[1];
-    let confirmation_links = app.get_confirmation_links(email_request);
-    reqwest::get(confirmation_links.html)
-        .await
-        .unwrap()
-        .error_for_status()
-        .unwrap();
 }

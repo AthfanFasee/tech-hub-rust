@@ -1,4 +1,4 @@
-use crate::helpers::{TestApp, spawn_app};
+use crate::helpers::spawn_app;
 use serde_json::json;
 use sqlx::query;
 use uuid::Uuid;
@@ -122,7 +122,7 @@ async fn update_post_returns_400_for_invalid_payload() {
     let app = spawn_app().await;
     app.login().await;
 
-    let post_id = create_sample_post(&app).await;
+    let post_id = app.create_sample_post().await;
 
     let invalid_payloads = vec![
         json!({ "title": "", "text": "Some text", "img": "https://example.com/img.jpg" }),
@@ -167,7 +167,7 @@ async fn update_post_persists_changes_and_returns_200() {
     let app = spawn_app().await;
     app.login().await;
 
-    let post_id = create_sample_post(&app).await;
+    let post_id = app.create_sample_post().await;
 
     let payload = json!({
         "title": "Updated Title",
@@ -208,7 +208,7 @@ async fn delete_post_marks_post_as_deleted() {
     let app = spawn_app().await;
     app.login().await;
 
-    let post_id = create_sample_post(&app).await;
+    let post_id = app.create_sample_post().await;
 
     let response = app.delete_post(&post_id).await;
     assert_eq!(
@@ -229,9 +229,87 @@ async fn delete_post_marks_post_as_deleted() {
 }
 
 #[tokio::test]
-async fn delete_post_returns_404_for_nonexistent_id() {
+async fn post_can_only_be_deleted_by_creator_or_an_admin() {
     let app = spawn_app().await;
     app.login().await;
+
+    let post_id = app.create_sample_post().await;
+
+    app.logout().await;
+    let payload = app.create_activated_user().await;
+
+    app.login_with(&payload).await;
+
+    let response = app.delete_post(&post_id).await;
+    assert_eq!(
+        403,
+        response.status().as_u16(),
+        "Expected 403 forbidden request when non creator tries to delete a post"
+    );
+
+    app.login_admin().await;
+
+    let response = app.delete_post(&post_id).await;
+    assert_eq!(
+        200,
+        response.status().as_u16(),
+        "Expected 200 OK when an admin deletes a post created by someone else"
+    );
+
+    let record = query!("SELECT deleted_at FROM posts WHERE id = $1", post_id)
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to fetch deleted posts");
+
+    assert!(
+        record.deleted_at.is_some(),
+        "Expected deleted_at to be set after when an admin deletes a post created by someone else"
+    );
+}
+
+#[tokio::test]
+async fn forbidden_delete_post_request_does_not_leak_ownership_information() {
+    let app = spawn_app().await;
+    app.login().await;
+
+    let post_id = app.create_sample_post().await;
+    app.logout().await;
+
+    let user_b = app.create_activated_user().await;
+    app.login_with(&user_b).await;
+
+    let response = app.delete_post(&post_id).await;
+    let status = response.status().as_u16();
+    let body = response.text().await.unwrap();
+
+    assert_eq!(
+        403, status,
+        "Expected 403 when a non-owner tries to delete a post"
+    );
+
+    // The error message must be generic and not leak ownership details
+    assert!(
+        body.contains("not authorized to perform this action"),
+        "Expected generic forbidden message. Actual body: {}",
+        body
+    );
+
+    // The post still exists (not soft deleted)
+    let record = query!("SELECT deleted_at FROM posts WHERE id = $1", post_id)
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to fetch deleted_at column");
+
+    assert!(
+        record.deleted_at.is_none(),
+        "Post should not be deleted when a non-owner attempts deletion"
+    );
+}
+
+#[tokio::test]
+async fn delete_post_returns_404_for_nonexistent_id_for_admin() {
+    let app = spawn_app().await;
+    app.login_admin().await;
 
     let random_id = Uuid::new_v4();
     let response = app.delete_post(&random_id).await;
@@ -244,11 +322,26 @@ async fn delete_post_returns_404_for_nonexistent_id() {
 }
 
 #[tokio::test]
-async fn delete_post_returns_404_if_already_deleted() {
+async fn delete_post_returns_403_for_nonexistent_id_for_non_admin_user() {
     let app = spawn_app().await;
     app.login().await;
 
-    let post_id = create_sample_post(&app).await;
+    let random_id = Uuid::new_v4();
+    let response = app.delete_post(&random_id).await;
+
+    assert_eq!(
+        403,
+        response.status().as_u16(),
+        "Expected 403 for delete attempt by unauthorized user"
+    );
+}
+
+#[tokio::test]
+async fn delete_post_returns_404_if_already_deleted() {
+    let app = spawn_app().await;
+    app.login_admin().await;
+
+    let post_id = app.create_sample_post().await;
 
     app.delete_post(&post_id).await;
 
@@ -279,7 +372,7 @@ async fn hard_delete_post_removes_from_database() {
     let app = spawn_app().await;
     app.login_admin().await;
 
-    let post_id = create_sample_post(&app).await;
+    let post_id = app.create_sample_post().await;
 
     let response = app.hard_delete_post(&post_id).await;
     assert_eq!(
@@ -304,7 +397,7 @@ async fn hard_delete_requires_admin_privileges() {
     let app = spawn_app().await;
     app.login().await;
 
-    let post_id = create_sample_post(&app).await;
+    let post_id = app.create_sample_post().await;
 
     let response = app.hard_delete_post(&post_id).await;
     assert_eq!(
@@ -341,7 +434,7 @@ async fn like_post_adds_user_to_liked_by() {
     let app = spawn_app().await;
     app.login().await;
 
-    let post_id = create_sample_post(&app).await;
+    let post_id = app.create_sample_post().await;
     let user_id = app.test_user.user_id;
 
     let response = app.like_post(&post_id).await;
@@ -370,7 +463,7 @@ async fn like_post_is_idempotent_for_same_user() {
     let app = spawn_app().await;
     app.login().await;
 
-    let post_id = create_sample_post(&app).await;
+    let post_id = app.create_sample_post().await;
     let user_id = app.test_user.user_id;
 
     // Like twice
@@ -414,7 +507,7 @@ async fn like_post_returns_401_if_unauthenticated() {
     let app = spawn_app().await;
     app.login().await;
 
-    let post_id = create_sample_post(&app).await;
+    let post_id = app.create_sample_post().await;
     app.logout().await;
 
     let response = app.like_post(&post_id).await;
@@ -430,7 +523,7 @@ async fn dislike_post_removes_user_from_liked_by() {
     let app = spawn_app().await;
     app.login().await;
 
-    let post_id = create_sample_post(&app).await;
+    let post_id = app.create_sample_post().await;
     let user_id = app.test_user.user_id;
 
     app.like_post(&post_id).await;
@@ -476,7 +569,7 @@ async fn dislike_post_returns_401_if_unauthenticated() {
     let app = spawn_app().await;
     app.login().await;
 
-    let post_id = create_sample_post(&app).await;
+    let post_id = app.create_sample_post().await;
     app.logout().await;
 
     let response = app.dislike_post(&post_id).await;
@@ -492,7 +585,7 @@ async fn get_post_returns_post_data_successfully() {
     let app = spawn_app().await;
     app.login().await;
 
-    let post_id = create_sample_post(&app).await;
+    let post_id = app.create_sample_post().await;
     let response = app.get_post(&post_id).await;
     assert_eq!(
         response.status().as_u16(),
@@ -524,7 +617,7 @@ async fn get_post_does_return_200_if_unauthenticated() {
     let app = spawn_app().await;
     app.login().await;
 
-    let post_id = create_sample_post(&app).await;
+    let post_id = app.create_sample_post().await;
     app.logout().await;
 
     let response = app.get_post(&post_id).await;
@@ -540,7 +633,7 @@ async fn get_post_does_not_return_deleted_posts() {
     let app = spawn_app().await;
     app.login().await;
 
-    let post_id = create_sample_post(&app).await;
+    let post_id = app.create_sample_post().await;
 
     // Soft delete manually
     query!(
@@ -562,21 +655,4 @@ async fn get_post_does_not_return_deleted_posts() {
         404,
         "Expected 404 for soft-deleted post"
     );
-}
-
-async fn create_sample_post(app: &TestApp) -> Uuid {
-    let payload = json!({
-        "title": "Initial title",
-        "text": "Initial text",
-        "img": "https://example.com/initial.jpg"
-    });
-
-    let response = app.create_post(&payload).await;
-    assert_eq!(
-        response.status().as_u16(),
-        201,
-        "Failed to create sample post"
-    );
-    let body: serde_json::Value = response.json().await.unwrap();
-    Uuid::parse_str(body["id"].as_str().unwrap()).unwrap()
 }

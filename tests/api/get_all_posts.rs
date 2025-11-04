@@ -1,28 +1,5 @@
-use crate::helpers::{TestApp, spawn_app};
-use serde_json::json;
+use crate::helpers::spawn_app;
 use uuid::Uuid;
-
-async fn create_sample_post(app: &TestApp, title: &str, text: &str) -> Uuid {
-    let payload = json!({
-        "title": title,
-        "text": text,
-        "img": "https://example.com/sample.jpg"
-    });
-
-    let response = app.create_post(&payload).await;
-    assert_eq!(
-        response.status().as_u16(),
-        201,
-        "Failed to create sample post"
-    );
-    let body: serde_json::Value = response.json().await.unwrap();
-    Uuid::parse_str(body["id"].as_str().unwrap()).unwrap()
-}
-
-async fn like_post_as_user(app: &TestApp, post_id: &Uuid) {
-    let response = app.like_post(post_id).await;
-    assert_eq!(response.status().as_u16(), 200, "Failed to like post");
-}
 
 // ============================================================================
 // Basic Functionality Tests
@@ -33,8 +10,8 @@ async fn get_all_posts_returns_posts_successfully() {
     let app = spawn_app().await;
     app.login().await;
 
-    create_sample_post(&app, "First Post", "First content").await;
-    create_sample_post(&app, "Second Post", "Second content").await;
+    app.create_sample_post().await;
+    app.create_sample_post().await;
 
     let response = app.get_all_posts("").await;
     assert_eq!(
@@ -54,7 +31,8 @@ async fn get_all_posts_works_without_authentication() {
     let app = spawn_app().await;
     app.login().await;
 
-    create_sample_post(&app, "Public Post", "Public content").await;
+    app.create_sample_post_custom("Public Post", "Public content")
+        .await;
 
     app.logout().await;
 
@@ -95,7 +73,8 @@ async fn get_all_posts_respects_pagination_limit() {
     app.login().await;
 
     for i in 1..=5 {
-        create_sample_post(&app, &format!("Post {i}"), "Content").await;
+        app.create_sample_post_custom(&format!("Post {i}"), "Content")
+            .await;
     }
 
     let response = app.get_all_posts("?limit=2").await;
@@ -117,7 +96,8 @@ async fn get_all_posts_respects_page_parameter() {
     app.login().await;
 
     for i in 1..=5 {
-        create_sample_post(&app, &format!("Post {i}"), "Content").await;
+        app.create_sample_post_custom(&format!("Post {i}"), "Content")
+            .await;
     }
 
     let response = app.get_all_posts("?limit=2&page=2").await;
@@ -134,7 +114,8 @@ async fn get_all_posts_returns_correct_metadata() {
     app.login().await;
 
     for i in 1..=10 {
-        create_sample_post(&app, &format!("Post {i}"), "Content").await;
+        app.create_sample_post_custom(&format!("Post {i}"), "Content")
+            .await;
     }
 
     let response = app.get_all_posts("?limit=3&page=1").await;
@@ -238,9 +219,9 @@ async fn get_all_posts_sorts_by_id_descending_by_default() {
     let app = spawn_app().await;
     app.login().await;
 
-    let id1 = create_sample_post(&app, "First", "Content").await;
-    let id2 = create_sample_post(&app, "Second", "Content").await;
-    let id3 = create_sample_post(&app, "Third", "Content").await;
+    let id1 = app.create_sample_post_custom("First", "Content").await;
+    let id2 = app.create_sample_post_custom("Second", "Content").await;
+    let id3 = app.create_sample_post_custom("Third", "Content").await;
 
     let response = app.get_all_posts("").await;
     assert_eq!(response.status().as_u16(), 200);
@@ -259,11 +240,11 @@ async fn get_all_posts_sorts_by_created_at_descending_by_default() {
     let app = spawn_app().await;
     app.login().await;
 
-    let id1 = create_sample_post(&app, "First", "Content").await;
+    let id1 = app.create_sample_post_custom("First", "Content").await;
     tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-    let id2 = create_sample_post(&app, "Second", "Content").await;
+    let id2 = app.create_sample_post_custom("Second", "Content").await;
     tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-    let id3 = create_sample_post(&app, "Third", "Content").await;
+    let id3 = app.create_sample_post_custom("Third", "Content").await;
 
     let response = app.get_all_posts("").await;
     assert_eq!(response.status().as_u16(), 200);
@@ -282,9 +263,9 @@ async fn get_all_posts_sorts_by_title_ascending() {
     let app = spawn_app().await;
     app.login().await;
 
-    create_sample_post(&app, "Zebra", "Content").await;
-    create_sample_post(&app, "Apple", "Content").await;
-    create_sample_post(&app, "Banana", "Content").await;
+    app.create_sample_post_custom("Zebra", "Content").await;
+    app.create_sample_post_custom("Apple", "Content").await;
+    app.create_sample_post_custom("Banana", "Content").await;
 
     let response = app.get_all_posts("?sort=title").await;
     assert_eq!(response.status().as_u16(), 200);
@@ -302,9 +283,9 @@ async fn get_all_posts_sorts_by_title_descending() {
     let app = spawn_app().await;
     app.login().await;
 
-    create_sample_post(&app, "Zebra", "Content").await;
-    create_sample_post(&app, "Apple", "Content").await;
-    create_sample_post(&app, "Banana", "Content").await;
+    app.create_sample_post_custom("Zebra", "Content").await;
+    app.create_sample_post_custom("Apple", "Content").await;
+    app.create_sample_post_custom("Banana", "Content").await;
 
     let response = app.get_all_posts("?sort=-title").await;
     assert_eq!(response.status().as_u16(), 200);
@@ -322,15 +303,15 @@ async fn get_all_posts_sorts_by_likes_count_descending() {
     let app = spawn_app().await;
     app.login().await;
 
-    create_sample_post(&app, "Post 1", "Content").await;
-    let post2 = create_sample_post(&app, "Post 2", "Content").await;
-    let post3 = create_sample_post(&app, "Post 3", "Content").await;
+    app.create_sample_post().await;
+    let post2 = app.create_sample_post().await;
+    let post3 = app.create_sample_post().await;
 
     // Like post2 twice (need different users or same user liking once)
-    like_post_as_user(&app, &post2).await;
+    app.like_post_as_user(&post2).await;
 
     // Like post3 once
-    like_post_as_user(&app, &post3).await;
+    app.like_post_as_user(&post3).await;
 
     // post1 has 0 likes
 
@@ -361,9 +342,12 @@ async fn get_all_posts_filters_by_title() {
     let app = spawn_app().await;
     app.login().await;
 
-    create_sample_post(&app, "Rust Programming", "Content").await;
-    create_sample_post(&app, "Python Tutorial", "Content").await;
-    create_sample_post(&app, "Rust Best Practices", "Content").await;
+    app.create_sample_post_custom("Rust Programming", "Content")
+        .await;
+    app.create_sample_post_custom("Python Tutorial", "Content")
+        .await;
+    app.create_sample_post_custom("Rust Best Practices", "Content")
+        .await;
 
     let response = app.get_all_posts("?title=Rust").await;
     assert_eq!(response.status().as_u16(), 200);
@@ -380,8 +364,10 @@ async fn get_all_posts_title_search_is_case_insensitive() {
     let app = spawn_app().await;
     app.login().await;
 
-    create_sample_post(&app, "JavaScript Tutorial", "Content").await;
-    create_sample_post(&app, "Python Guide", "Content").await;
+    app.create_sample_post_custom("JavaScript Tutorial", "Content")
+        .await;
+    app.create_sample_post_custom("Python Guide", "Content")
+        .await;
 
     let response = app.get_all_posts("?title=javascript").await;
     assert_eq!(response.status().as_u16(), 200);
@@ -398,8 +384,8 @@ async fn get_all_posts_returns_all_posts_when_title_is_empty() {
     let app = spawn_app().await;
     app.login().await;
 
-    create_sample_post(&app, "Post 1", "Content").await;
-    create_sample_post(&app, "Post 2", "Content").await;
+    app.create_sample_post().await;
+    app.create_sample_post().await;
 
     let response = app.get_all_posts("?title=").await;
     assert_eq!(response.status().as_u16(), 200);
@@ -419,8 +405,8 @@ async fn get_all_posts_filters_by_creator_id() {
 
     let creator_id = app.test_user.user_id;
 
-    create_sample_post(&app, "My Post 1", "Content").await;
-    create_sample_post(&app, "My Post 2", "Content").await;
+    app.create_sample_post().await;
+    app.create_sample_post().await;
 
     let response = app.get_all_posts(&format!("?id={creator_id}")).await;
     assert_eq!(response.status().as_u16(), 200);
@@ -441,7 +427,7 @@ async fn get_all_posts_returns_empty_for_nonexistent_creator() {
     let app = spawn_app().await;
     app.login().await;
 
-    create_sample_post(&app, "Some Post", "Content").await;
+    app.create_sample_post().await;
 
     let random_id = Uuid::new_v4();
     let response = app.get_all_posts(&format!("?id={random_id}")).await;
@@ -456,8 +442,8 @@ async fn get_all_posts_returns_all_posts_when_id_is_empty() {
     let app = spawn_app().await;
     app.login().await;
 
-    create_sample_post(&app, "Post 1", "Content").await;
-    create_sample_post(&app, "Post 2", "Content").await;
+    app.create_sample_post().await;
+    app.create_sample_post().await;
 
     let response = app.get_all_posts("?id=").await;
     assert_eq!(response.status().as_u16(), 200);
@@ -475,8 +461,12 @@ async fn get_all_posts_excludes_soft_deleted_posts() {
     let app = spawn_app().await;
     app.login().await;
 
-    let post1 = create_sample_post(&app, "Active Post", "Content").await;
-    let post2 = create_sample_post(&app, "Deleted Post", "Content").await;
+    let post1 = app
+        .create_sample_post_custom("Active Post", "Content")
+        .await;
+    let post2 = app
+        .create_sample_post_custom("Deleted Post", "Content")
+        .await;
 
     // Soft delete post2
     app.delete_post(&post2).await;
@@ -500,7 +490,8 @@ async fn get_all_posts_returns_correct_post_structure() {
     let app = spawn_app().await;
     app.login().await;
 
-    create_sample_post(&app, "Test Post", "Test Content").await;
+    app.create_sample_post_custom("Test Post", "Test Content")
+        .await;
 
     let response = app.get_all_posts("").await;
     assert_eq!(response.status().as_u16(), 200);
@@ -516,6 +507,7 @@ async fn get_all_posts_returns_correct_post_structure() {
     assert!(post["version"].is_number());
     assert!(post["created_at"].is_string());
     assert!(post["created_by"].is_string());
+    assert!(post["created_by_name"].is_string());
     assert!(post["liked_by"].is_array());
 }
 
@@ -530,9 +522,12 @@ async fn get_all_posts_combines_title_and_creator_filters() {
 
     let creator_id = app.test_user.user_id;
 
-    create_sample_post(&app, "Rust Tutorial", "Content").await;
-    create_sample_post(&app, "Python Guide", "Content").await;
-    create_sample_post(&app, "Rust Advanced", "Content").await;
+    app.create_sample_post_custom("Rust Tutorial", "Content")
+        .await;
+    app.create_sample_post_custom("Python Guide", "Content")
+        .await;
+    app.create_sample_post_custom("Rust Advanced", "Content")
+        .await;
 
     let response = app
         .get_all_posts(&format!("?title=Rust&id={creator_id}"))
@@ -551,9 +546,12 @@ async fn get_all_posts_combines_filters_with_pagination_and_sorting() {
     let app = spawn_app().await;
     app.login().await;
 
-    create_sample_post(&app, "Apple Tutorial", "Content").await;
-    create_sample_post(&app, "Banana Guide", "Content").await;
-    create_sample_post(&app, "Cherry Advanced", "Content").await;
+    app.create_sample_post_custom("Apple Tutorial", "Content")
+        .await;
+    app.create_sample_post_custom("Banana Guide", "Content")
+        .await;
+    app.create_sample_post_custom("Cherry Advanced", "Content")
+        .await;
 
     let response = app.get_all_posts("?sort=title&limit=2&page=1").await;
     assert_eq!(response.status().as_u16(), 200);
