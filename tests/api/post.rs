@@ -3,6 +3,10 @@ use serde_json::json;
 use sqlx::query;
 use uuid::Uuid;
 
+// ============================================================================
+// Create Post
+// ============================================================================
+
 #[tokio::test]
 async fn user_must_be_logged_in_to_create_post() {
     let app = spawn_app().await;
@@ -97,6 +101,10 @@ async fn create_post_persists_valid_post_and_returns_201() {
     );
 }
 
+// ============================================================================
+// Update Post
+// ============================================================================
+
 #[tokio::test]
 async fn user_must_be_logged_in_to_update_post() {
     let app = spawn_app().await;
@@ -114,6 +122,98 @@ async fn user_must_be_logged_in_to_update_post() {
         401,
         response.status().as_u16(),
         "The API did not return 401 Unauthorized for unauthenticated user."
+    );
+}
+
+#[tokio::test]
+async fn non_creator_non_admin_cannot_update_post() {
+    let app = spawn_app().await;
+    app.login().await;
+
+    let post_id = app.create_sample_post().await;
+
+    // logout, create a different user
+    app.logout().await;
+    let payload_user = app.create_activated_user().await;
+    app.login_with(&payload_user).await;
+
+    let payload = json!({
+        "title": "Hacked title",
+        "text": "Hacked text",
+        "img": "https://example.com/hacked.jpg"
+    });
+
+    let response = app.update_post(&post_id, &payload).await;
+
+    assert_eq!(
+        403,
+        response.status().as_u16(),
+        "Expected 403 Forbidden when non-creator tries to update post"
+    );
+}
+
+#[tokio::test]
+async fn admin_can_update_post_created_by_someone_else() {
+    let app = spawn_app().await;
+    app.login().await;
+
+    let post_id = app.create_sample_post().await;
+    app.logout().await;
+
+    app.login_admin().await;
+
+    let payload = json!({
+        "title": "Admin Updated",
+        "text": "Admin text",
+        "img": "https://example.com/admin.jpg"
+    });
+
+    let response = app.update_post(&post_id, &payload).await;
+    assert_eq!(
+        200,
+        response.status().as_u16(),
+        "Admin should be able to update any post"
+    );
+}
+
+#[tokio::test]
+async fn update_post_returns_403_for_nonexistent_id_when_unauthorized() {
+    let app = spawn_app().await;
+
+    app.login().await; // normal user
+
+    let payload = json!({
+        "title": "Updated title",
+        "text": "Updated text",
+        "img": "https://example.com/updated.jpg"
+    });
+
+    let response = app.update_post(&Uuid::new_v4(), &payload).await;
+
+    assert_eq!(
+        403,
+        response.status().as_u16(),
+        "Unauthorized users should not learn whether a post exists"
+    );
+}
+
+#[tokio::test]
+async fn update_post_returns_404_for_nonexistent_id_when_authorized() {
+    let app = spawn_app().await;
+    app.login_admin().await;
+
+    let payload = json!({
+        "title": "Updated title",
+        "text": "Updated text",
+        "img": "https://example.com/updated.jpg"
+    });
+
+    let response = app.update_post(&Uuid::new_v4(), &payload).await;
+
+    assert_eq!(
+        404,
+        response.status().as_u16(),
+        "Authorized requests should return 404 for missing post id"
     );
 }
 
@@ -140,26 +240,6 @@ async fn update_post_returns_400_for_invalid_payload() {
             response.status()
         );
     }
-}
-
-#[tokio::test]
-async fn update_post_returns_404_if_not_found() {
-    let app = spawn_app().await;
-    app.login().await;
-
-    let payload = json!({
-        "title": "Updated title",
-        "text": "Updated text",
-        "img": "https://example.com/updated.jpg"
-    });
-
-    let response = app.update_post(&Uuid::new_v4(), &payload).await;
-
-    assert_eq!(
-        404,
-        response.status().as_u16(),
-        "Expected 404 Not Found for non-existing post."
-    );
 }
 
 #[tokio::test]
@@ -203,6 +283,10 @@ async fn update_post_persists_changes_and_returns_200() {
     assert!(record.version > 1, "Version should have been incremented");
 }
 
+// ============================================================================
+// Delete Post
+// ============================================================================
+
 #[tokio::test]
 async fn delete_post_marks_post_as_deleted() {
     let app = spawn_app().await;
@@ -235,9 +319,10 @@ async fn post_can_only_be_deleted_by_creator_or_an_admin() {
 
     let post_id = app.create_sample_post().await;
 
+    // logout, create a different user
     app.logout().await;
-    let payload = app.create_activated_user().await;
 
+    let payload = app.create_activated_user().await;
     app.login_with(&payload).await;
 
     let response = app.delete_post(&post_id).await;
@@ -367,6 +452,10 @@ async fn delete_post_requires_authentication() {
     );
 }
 
+// ============================================================================
+// Hard Delete Post
+// ============================================================================
+
 #[tokio::test]
 async fn hard_delete_post_removes_from_database() {
     let app = spawn_app().await;
@@ -428,6 +517,10 @@ async fn hard_delete_returns_404_for_nonexistent_post() {
         "Expected 404 when admin tries to delete non-existing post"
     );
 }
+
+// ============================================================================
+// Like Post
+// ============================================================================
 
 #[tokio::test]
 async fn like_post_adds_user_to_liked_by() {
@@ -518,6 +611,10 @@ async fn like_post_returns_401_if_unauthenticated() {
     );
 }
 
+// ============================================================================
+// Dislike Post
+// ============================================================================
+
 #[tokio::test]
 async fn dislike_post_removes_user_from_liked_by() {
     let app = spawn_app().await;
@@ -579,6 +676,10 @@ async fn dislike_post_returns_401_if_unauthenticated() {
         "Expected 401 for unauthenticated dislike request"
     );
 }
+
+// ============================================================================
+// Get Post
+// ============================================================================
 
 #[tokio::test]
 async fn get_post_returns_post_data_successfully() {

@@ -2,7 +2,7 @@ use crate::helpers::spawn_app;
 use uuid::Uuid;
 
 // ============================================================================
-// Basic Functionality Tests
+// Basic Functionality
 // ============================================================================
 
 #[tokio::test]
@@ -64,7 +64,7 @@ async fn get_all_posts_returns_empty_array_when_no_posts() {
 }
 
 // ============================================================================
-// Pagination Tests
+// Pagination
 // ============================================================================
 
 #[tokio::test]
@@ -130,7 +130,7 @@ async fn get_all_posts_returns_correct_metadata() {
 }
 
 // ============================================================================
-// Validation Tests
+// Validation
 // ============================================================================
 
 #[tokio::test]
@@ -211,7 +211,7 @@ async fn get_all_posts_rejects_title_exceeding_maximum_length() {
 }
 
 // ============================================================================
-// Sorting Tests
+// Sorting
 // ============================================================================
 
 #[tokio::test]
@@ -334,7 +334,7 @@ async fn get_all_posts_sorts_by_likes_count_descending() {
 }
 
 // ============================================================================
-// Title Search Tests
+// Title Search
 // ============================================================================
 
 #[tokio::test]
@@ -395,7 +395,7 @@ async fn get_all_posts_returns_all_posts_when_title_is_empty() {
 }
 
 // ============================================================================
-// Filter by Creator Tests
+// Filter by Creator
 // ============================================================================
 
 #[tokio::test]
@@ -453,7 +453,7 @@ async fn get_all_posts_returns_all_posts_when_id_is_empty() {
 }
 
 // ============================================================================
-// Soft Delete Tests
+// Soft Delete
 // ============================================================================
 
 #[tokio::test]
@@ -482,7 +482,7 @@ async fn get_all_posts_excludes_soft_deleted_posts() {
 }
 
 // ============================================================================
-// Response Structure Tests
+// Response Structure
 // ============================================================================
 
 #[tokio::test]
@@ -512,7 +512,7 @@ async fn get_all_posts_returns_correct_post_structure() {
 }
 
 // ============================================================================
-// Combined Filters Tests
+// Combined Filters
 // ============================================================================
 
 #[tokio::test]
