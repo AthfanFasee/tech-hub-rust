@@ -1,4 +1,4 @@
-use crate::helpers::{TestApp, spawn_app};
+use crate::helpers::spawn_app;
 use serde_json::json;
 use sqlx::query;
 use uuid::Uuid;
@@ -8,7 +8,7 @@ async fn create_comment_returns_201_for_valid_input() {
     let app = spawn_app().await;
     app.login().await;
 
-    let post_id = create_sample_post(&app).await;
+    let post_id = app.create_sample_post().await;
 
     let payload = json!({
         "text": "This is a test comment",
@@ -51,7 +51,7 @@ async fn create_comment_returns_400_for_empty_text() {
     let app = spawn_app().await;
     app.login().await;
 
-    let post_id = create_sample_post(&app).await;
+    let post_id = app.create_sample_post().await;
 
     let payload = json!({
         "text": "",
@@ -71,7 +71,7 @@ async fn create_comment_returns_401_if_unauthenticated() {
     let app = spawn_app().await;
     app.login().await;
 
-    let post_id = create_sample_post(&app).await;
+    let post_id = app.create_sample_post().await;
     app.logout().await;
 
     let payload = json!({
@@ -93,7 +93,7 @@ async fn show_comments_for_post_returns_200_and_list() {
     let app = spawn_app().await;
     app.login().await;
 
-    let post_id = create_sample_post(&app).await;
+    let post_id = app.create_sample_post().await;
 
     for i in 0..3 {
         let payload = json!({
@@ -124,7 +124,7 @@ async fn show_comments_returns_empty_array_for_post_with_no_comments() {
     let app = spawn_app().await;
     app.login().await;
 
-    let post_id = create_sample_post(&app).await;
+    let post_id = app.create_sample_post().await;
 
     app.logout().await;
     let response = app.get_comments(&post_id).await;
@@ -139,7 +139,7 @@ async fn delete_comment_removes_comment_successfully() {
     let app = spawn_app().await;
     app.login().await;
 
-    let post_id = create_sample_post(&app).await;
+    let post_id = app.create_sample_post().await;
 
     let payload = json!({
         "text": "To be deleted",
@@ -189,7 +189,7 @@ async fn delete_comment_returns_401_if_unauthenticated() {
     let app = spawn_app().await;
     app.login().await;
 
-    let post_id = create_sample_post(&app).await;
+    let post_id = app.create_sample_post().await;
     let payload = json!({
         "text": "To test unauthorized delete",
         "post_id": post_id.to_string()
@@ -208,17 +208,4 @@ async fn delete_comment_returns_401_if_unauthenticated() {
         401,
         "Expected 401 for unauthenticated comment delete"
     );
-}
-
-async fn create_sample_post(app: &TestApp) -> Uuid {
-    let payload = json!({
-        "title": "Post for comments",
-        "text": "This is a sample posts to attach comments to",
-        "img": "https://example.com/posts.jpg"
-    });
-
-    let response = app.create_post(&payload).await;
-    assert_eq!(response.status().as_u16(), 201);
-    let body: serde_json::Value = response.json().await.unwrap();
-    Uuid::parse_str(body["id"].as_str().unwrap()).unwrap()
 }

@@ -1,4 +1,4 @@
-use crate::authentication::UserId;
+use crate::authentication::{IsAdmin, UserId};
 use crate::domain::{
     CreatePostPayload, CreatePostResponse, CreatedBy, Filters, GetAllPostsQuery, Img, Metadata,
     Post, PostQuery, PostRecord, PostResponse, QueryTitle, SortDirection, Text, Title,
@@ -21,6 +21,9 @@ pub enum PostError {
     #[error("post not found")]
     NotFound,
 
+    #[error("not authorized to perform this action")]
+    Forbidden,
+
     #[error("edit conflict: posts was modified by another request")]
     EditConflict,
 
@@ -39,6 +42,7 @@ impl ResponseError for PostError {
         let status_code = match self {
             PostError::ValidationError(_) => StatusCode::BAD_REQUEST,
             PostError::NotFound => StatusCode::NOT_FOUND,
+            PostError::Forbidden => StatusCode::FORBIDDEN,
             PostError::EditConflict => StatusCode::CONFLICT,
             PostError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
@@ -320,14 +324,26 @@ async fn update_post_in_db(
 
 #[tracing::instrument(
     skip(pool),
-    fields(post_id=%path.id)
+    fields(post_id=%path.id, user_id=%&*user_id)
 )]
 pub async fn delete_post(
     path: web::Path<PostPathParams>,
     pool: web::Data<PgPool>,
     user_id: web::ReqData<UserId>,
+    is_admin: web::ReqData<IsAdmin>,
 ) -> Result<HttpResponse, PostError> {
     let post_id = path.id;
+    let user_id = *user_id.into_inner();
+    let is_admin = *is_admin.into_inner();
+
+    // If not admin, verify ownership
+    if !is_admin {
+        let is_owner = did_user_create_the_post(post_id, user_id, &pool).await?;
+
+        if !is_owner {
+            return Err(PostError::Forbidden);
+        }
+    }
 
     // Soft delete: mark deleted_at = now()
     let result = sqlx::query!(
@@ -440,4 +456,30 @@ async fn remove_like_from_post(
     }
 
     Ok(())
+}
+
+#[tracing::instrument(skip(pool))]
+pub async fn did_user_create_the_post(
+    post_id: Uuid,
+    user_id: Uuid,
+    pool: &PgPool,
+) -> Result<bool, PostError> {
+    let result = sqlx::query_scalar!(
+        r#"
+        SELECT EXISTS(
+            SELECT 1
+            FROM posts
+            WHERE id = $1
+            AND created_by = $2
+            AND deleted_at IS NULL
+        ) AS "exists!"
+        "#,
+        post_id,
+        user_id
+    )
+    .fetch_one(pool)
+    .await
+    .context("Failed to check if user created this post")?;
+
+    Ok(result)
 }

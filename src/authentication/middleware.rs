@@ -25,6 +25,23 @@ impl Deref for UserId {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+pub struct IsAdmin(bool);
+
+impl std::fmt::Display for IsAdmin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl Deref for IsAdmin {
+    type Target = bool;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 // Middleware that rejects requests from unauthenticated users
 pub async fn reject_anonymous_users(
     mut req: ServiceRequest,
@@ -40,7 +57,13 @@ pub async fn reject_anonymous_users(
         .map_err(|e| app_error(StatusCode::INTERNAL_SERVER_ERROR, e))?
         .ok_or_else(|| app_error(StatusCode::UNAUTHORIZED, "User has not logged in"))?;
 
+    let is_admin = session
+        .get_is_admin()
+        .map_err(|e| app_error(StatusCode::INTERNAL_SERVER_ERROR, e))?
+        .ok_or_else(|| app_error(StatusCode::UNAUTHORIZED, "User has not logged in"))?;
+
     req.extensions_mut().insert(UserId(user_id));
+    req.extensions_mut().insert(IsAdmin(is_admin));
     next.call(req).await
 }
 
