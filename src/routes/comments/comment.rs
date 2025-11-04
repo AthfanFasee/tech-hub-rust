@@ -1,8 +1,9 @@
-use crate::authentication::UserId;
+use crate::authentication::{IsAdmin, UserId};
 use crate::domain::{
     Comment, CommentRecord, CommentResponseBody, CreateCommentPayload, CreateCommentResponseBody,
 };
 use crate::{build_error_response, error_chain_fmt};
+use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, ResponseError, web};
 use anyhow::Context;
 use chrono::{DateTime, Utc};
@@ -19,6 +20,9 @@ pub enum CommentError {
     #[error("comment not found")]
     NotFound,
 
+    #[error("not authorized to perform this action")]
+    Forbidden,
+
     #[error(transparent)]
     UnexpectedError(#[from] anyhow::Error),
 }
@@ -32,9 +36,10 @@ impl std::fmt::Debug for CommentError {
 impl ResponseError for CommentError {
     fn error_response(&self) -> HttpResponse {
         let status_code = match self {
-            CommentError::ValidationError(_) => actix_web::http::StatusCode::BAD_REQUEST,
-            CommentError::NotFound => actix_web::http::StatusCode::NOT_FOUND,
-            CommentError::UnexpectedError(_) => actix_web::http::StatusCode::INTERNAL_SERVER_ERROR,
+            CommentError::ValidationError(_) => StatusCode::BAD_REQUEST,
+            CommentError::NotFound => StatusCode::NOT_FOUND,
+            CommentError::Forbidden => StatusCode::FORBIDDEN,
+            CommentError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
         build_error_response(status_code, self.to_string())
@@ -140,11 +145,23 @@ pub async fn insert_comment(
 pub async fn delete_comment(
     path: web::Path<CommentPathParams>,
     pool: web::Data<PgPool>,
+    user_id: web::ReqData<UserId>,
+    is_admin: web::ReqData<IsAdmin>,
 ) -> Result<HttpResponse, CommentError> {
-    let id = path.id;
+    let comment_id = path.id;
+    let user_id = user_id.into_inner();
+    let is_admin = *is_admin.into_inner();
 
-    delete_comment_db(id, &pool).await?;
+    // If not admin, verify ownership
+    if !is_admin {
+        let is_owner = did_user_create_the_comment(comment_id, *user_id, &pool).await?;
 
+        if !is_owner {
+            return Err(CommentError::Forbidden);
+        }
+    }
+
+    delete_comment_db(comment_id, &pool).await?;
     Ok(HttpResponse::Ok().finish())
 }
 
@@ -166,4 +183,29 @@ pub async fn delete_comment_db(id: Uuid, pool: &PgPool) -> Result<(), CommentErr
     }
 
     Ok(())
+}
+
+#[tracing::instrument(skip(pool))]
+pub async fn did_user_create_the_comment(
+    comment_id: Uuid,
+    user_id: Uuid,
+    pool: &PgPool,
+) -> Result<bool, CommentError> {
+    let result = sqlx::query_scalar!(
+        r#"
+        SELECT EXISTS(
+            SELECT 1
+            FROM comments
+            WHERE id = $1
+            AND created_by = $2
+        ) AS "exists!"
+        "#,
+        comment_id,
+        user_id
+    )
+    .fetch_one(pool)
+    .await
+    .context("Failed to check if user created this comment")?;
+
+    Ok(result)
 }
