@@ -6,7 +6,7 @@ use wiremock::matchers;
 use wiremock::{Mock, ResponseTemplate};
 
 #[tokio::test]
-async fn newsletters_are_not_delivered_to_inactivated_user() {
+async fn publish_newsletter_does_not_deliver_to_inactivated_user() {
     let app = helpers::spawn_app().await;
     app.create_inactivated_user().await;
     app.login_admin().await;
@@ -33,7 +33,7 @@ async fn newsletters_are_not_delivered_to_inactivated_user() {
 }
 
 #[tokio::test]
-async fn newsletters_are_not_delivered_to_confirmed_but_unsubscribed_users() {
+async fn publish_newsletter_does_not_deliver_to_activated_but_unsubscribed_users() {
     let app = helpers::spawn_app().await;
     app.create_activated_user().await;
     app.login_admin().await;
@@ -61,7 +61,7 @@ async fn newsletters_are_not_delivered_to_confirmed_but_unsubscribed_users() {
 }
 
 #[tokio::test]
-async fn newsletters_returns_400_for_invalid_data() {
+async fn publish_newsletter_returns_400_for_invalid_data() {
     let app = helpers::spawn_app().await;
     app.login_admin().await;
 
@@ -243,7 +243,7 @@ async fn newsletters_returns_400_for_invalid_data() {
 }
 
 #[tokio::test]
-async fn newsletters_returns_200_for_valid_data() {
+async fn publish_newsletter_returns_200_for_valid_data() {
     let app = helpers::spawn_app().await;
     app.login_admin().await;
 
@@ -324,7 +324,7 @@ async fn newsletters_returns_200_for_valid_data() {
 }
 
 #[tokio::test]
-async fn non_admins_are_rejected_to_publish_newsletters() {
+async fn publish_newsletter_returns_403_for_non_admins() {
     let app = helpers::spawn_app().await;
     app.login().await;
 
@@ -342,7 +342,7 @@ async fn non_admins_are_rejected_to_publish_newsletters() {
 }
 
 #[tokio::test]
-async fn anonymous_users_cannot_publish_newsletters() {
+async fn publish_newsletter_returns_401_for_anonymous_users() {
     let app = helpers::spawn_app().await;
 
     let newsletter_body = serde_json::json!({
@@ -359,7 +359,7 @@ async fn anonymous_users_cannot_publish_newsletters() {
 }
 
 #[tokio::test]
-async fn newsletters_are_delivered_to_a_user_who_subscribed_via_the_full_flow() {
+async fn publish_newsletter_delivers_to_active_subscriber_full_flow() {
     let app = helpers::spawn_app().await;
     app.create_active_subscriber().await;
     app.login_admin().await;
@@ -387,7 +387,7 @@ async fn newsletters_are_delivered_to_a_user_who_subscribed_via_the_full_flow() 
 }
 
 #[tokio::test]
-async fn newsletter_publishing_is_idempotent() {
+async fn publish_newsletter_is_idempotent() {
     let app = helpers::spawn_app().await;
     app.create_active_subscriber().await;
     app.login_admin().await;
@@ -418,7 +418,7 @@ async fn newsletter_publishing_is_idempotent() {
 }
 
 #[tokio::test]
-async fn concurrent_newsletter_publishing_is_handled_gracefully() {
+async fn publish_newsletter_handles_concurrent_requests_gracefully() {
     let app = helpers::spawn_app().await;
     app.create_active_subscriber().await;
     app.login_admin().await;
@@ -456,7 +456,7 @@ async fn concurrent_newsletter_publishing_is_handled_gracefully() {
 }
 
 #[tokio::test]
-async fn failed_newsletter_delivery_is_retried_with_back_off() {
+async fn publish_newsletter_retries_failed_delivery_with_back_off() {
     let app = helpers::spawn_app().await;
     app.create_active_subscriber().await;
     app.login_admin().await;
@@ -517,7 +517,7 @@ async fn failed_newsletter_delivery_is_retried_with_back_off() {
 }
 
 #[tokio::test]
-async fn old_newsletter_issues_are_cleaned_up() {
+async fn cleanup_old_newsletter_issues_deletes_issues_older_than_7_days() {
     let app = helpers::spawn_app().await;
     let pool = &app.db_pool;
 

@@ -2,7 +2,7 @@ use crate::helpers;
 use techhub::newsletter_delivery_worker;
 
 #[tokio::test]
-async fn old_idempotency_records_are_cleaned_up() {
+async fn cleanup_old_idempotency_records_deletes_records_older_than_48_hours() {
     let app = helpers::spawn_app().await;
     let pool = &app.db_pool;
 

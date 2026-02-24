@@ -3,27 +3,7 @@ use wiremock::matchers;
 use wiremock::{Mock, ResponseTemplate};
 
 #[tokio::test]
-async fn the_link_sent_by_send_subscribe_email_returns_a_200_if_called() {
-    let app = helpers::spawn_app().await;
-    app.login().await;
-
-    Mock::given(matchers::path("/email"))
-        .and(matchers::method("POST"))
-        .respond_with(ResponseTemplate::new(200))
-        .mount(&app.email_server)
-        .await;
-
-    app.send_subscribe_email().await;
-
-    let email_request = &app.email_server.received_requests().await.unwrap()[0];
-    let confirmation_links = app.get_confirmation_links(email_request);
-
-    let response = reqwest::get(confirmation_links.html).await.unwrap();
-    assert_eq!(response.status().as_u16(), 200);
-}
-
-#[tokio::test]
-async fn clicking_on_the_confirm_subscription_link_subscribes_a_user_in_db() {
+async fn subscription_link_via_email_subscribes_a_user() {
     let app = helpers::spawn_app().await;
     app.login().await;
 
@@ -66,7 +46,7 @@ async fn clicking_on_the_confirm_subscription_link_subscribes_a_user_in_db() {
 }
 
 #[tokio::test]
-async fn subscribe_user_requests_without_token_are_rejected_with_a_400() {
+async fn subscribe_user_returns_400_when_token_is_missing() {
     let app = helpers::spawn_app().await;
 
     let response = reqwest::get(&format!("{}/v1/user/confirm/subscribe", app.address))
@@ -76,7 +56,7 @@ async fn subscribe_user_requests_without_token_are_rejected_with_a_400() {
 }
 
 #[tokio::test]
-async fn subscribe_user_with_invalid_token_returns_401() {
+async fn subscribe_user_returns_401_for_invalid_token() {
     let app = helpers::spawn_app().await;
 
     let response = reqwest::get(&format!(
@@ -89,7 +69,7 @@ async fn subscribe_user_with_invalid_token_returns_401() {
 }
 
 #[tokio::test]
-async fn subscription_token_is_deleted_after_successful_subscription() {
+async fn subscribe_user_deletes_subscription_token_after_successful_subscription() {
     let app = helpers::spawn_app().await;
     app.login().await;
 

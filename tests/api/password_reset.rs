@@ -2,7 +2,7 @@ use crate::helpers;
 use uuid::Uuid;
 
 #[tokio::test]
-async fn user_must_be_logged_in_to_change_their_password() {
+async fn change_password_returns_401_for_unauthenticated_users() {
     let app = helpers::spawn_app().await;
     let new_password = Uuid::new_v4().to_string();
 
@@ -21,7 +21,7 @@ async fn user_must_be_logged_in_to_change_their_password() {
 }
 
 #[tokio::test]
-async fn current_password_must_be_valid() {
+async fn change_password_returns_401_for_invalid_current_password() {
     let app = helpers::spawn_app().await;
     let new_password = Uuid::new_v4().to_string();
     let wrong_password = Uuid::new_v4().to_string();
@@ -43,7 +43,7 @@ async fn current_password_must_be_valid() {
 }
 
 #[tokio::test]
-async fn changing_password_works() {
+async fn change_password_changes_password_and_returns_200() {
     let app = helpers::spawn_app().await;
     let new_password = Uuid::new_v4().to_string();
 
