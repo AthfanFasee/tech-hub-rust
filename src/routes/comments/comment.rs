@@ -9,6 +9,8 @@ use anyhow::Context;
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use sqlx::PgPool;
+use std::fmt;
+use std::fmt::{Debug, Formatter};
 use thiserror;
 use uuid::Uuid;
 
@@ -27,8 +29,8 @@ pub enum CommentError {
     UnexpectedError(#[from] anyhow::Error),
 }
 
-impl std::fmt::Debug for CommentError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Debug for CommentError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         utils::error_chain_fmt(self, f)
     }
 }

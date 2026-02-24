@@ -1,4 +1,5 @@
 use crate::helpers;
+use serde_json::Value;
 use sqlx::query;
 use uuid::Uuid;
 
@@ -61,7 +62,7 @@ async fn create_post_persists_valid_post_and_returns_201() {
     let response = app.create_post(&payload).await;
     assert_eq!(response.status().as_u16(), 201);
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
 
     assert_eq!(body["title"], "My first blog posts");
     assert_eq!(body["post_text"], "This is a test posts");
@@ -257,7 +258,7 @@ async fn update_post_persists_changes_and_returns_200() {
     let response = app.update_post(&post_id, &payload).await;
     assert_eq!(response.status().as_u16(), 200, "Update failed");
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     let post = &body["posts"];
 
     assert_eq!(post["title"], "Updated Title");
@@ -693,7 +694,7 @@ async fn get_post_returns_post_data_successfully() {
         "Expected 200 OK when fetching an existing post"
     );
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     assert_eq!(body["posts"]["id"], post_id.to_string());
     assert!(body["posts"]["title"].is_string());
 }

@@ -1,6 +1,6 @@
 use crate::authentication;
 use crate::routes;
-use actix_web::middleware::from_fn;
+use actix_web::middleware;
 use actix_web::web;
 
 pub fn post_routes(cfg: &mut web::ServiceConfig) {
@@ -11,7 +11,7 @@ pub fn post_routes(cfg: &mut web::ServiceConfig) {
         // Protected routes (require authentication)
         .service(
             web::scope("/me")
-                .wrap(from_fn(authentication::reject_anonymous_users))
+                .wrap(middleware::from_fn(authentication::reject_anonymous_users))
                 .route("/create", web::post().to(routes::create_post))
                 .route("/update/{id}", web::patch().to(routes::update_post))
                 .route("/delete/{id}", web::delete().to(routes::delete_post))

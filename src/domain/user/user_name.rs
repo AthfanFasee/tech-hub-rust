@@ -1,3 +1,5 @@
+use std::fmt;
+use std::fmt::{Display, Formatter};
 use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Debug)]
@@ -31,8 +33,8 @@ impl AsRef<str> for UserName {
     }
 }
 
-impl std::fmt::Display for UserName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for UserName {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }
 }

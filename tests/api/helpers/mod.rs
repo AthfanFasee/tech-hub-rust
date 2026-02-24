@@ -6,9 +6,11 @@ mod user;
 
 use argon2::password_hash::SaltString;
 use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version};
+use reqwest::{Client, Url};
 use secrecy::Secret;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::sync::OnceLock;
+use std::{env, io};
 use techhub::configuration;
 use techhub::configuration::DatabaseConfigs;
 use techhub::email_client::EmailClient;
@@ -70,13 +72,13 @@ pub struct TestApp {
     pub email_server: MockServer,
     pub port: u16,
     pub test_user: TestUser,
-    pub api_client: reqwest::Client,
+    pub api_client: Client,
     pub email_client: EmailClient,
 }
 
 pub struct ConfirmationLinks {
-    pub html: reqwest::Url,
-    pub plain_text: reqwest::Url,
+    pub html: Url,
+    pub plain_text: Url,
 }
 
 static TRACING: OnceLock<()> = OnceLock::new();
@@ -86,18 +88,18 @@ pub fn init_tracing() {
         let default_filter_level = "info".to_string();
         let subscriber_name = "test".to_string();
 
-        if std::env::var("TEST_LOG").is_ok() {
+        if env::var("TEST_LOG").is_ok() {
             let subscriber = telemetry::get_subscriber(
                 subscriber_name.clone(),
                 default_filter_level.clone(),
-                std::io::stdout,
+                io::stdout,
             );
             telemetry::init_subscriber(subscriber);
         } else {
             let subscriber = telemetry::get_subscriber(
                 subscriber_name.clone(),
                 default_filter_level.clone(),
-                std::io::sink,
+                io::sink,
             );
             telemetry::init_subscriber(subscriber);
         };
@@ -123,12 +125,9 @@ pub async fn spawn_app() -> TestApp {
         .await
         .expect("Failed to build application.");
     let application_port = application.port();
-    let _ = tokio::spawn(application.run_until_stopped());
+    tokio::spawn(application.run_until_stopped());
 
-    let client = reqwest::Client::builder()
-        .cookie_store(true)
-        .build()
-        .unwrap();
+    let client = Client::builder().cookie_store(true).build().unwrap();
 
     let test_app = TestApp {
         address: format!("http://localhost:{}", application_port),

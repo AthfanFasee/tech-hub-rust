@@ -1,4 +1,5 @@
 use crate::helpers;
+use serde_json::Value;
 use sqlx::query;
 use uuid::Uuid;
 
@@ -25,7 +26,7 @@ async fn create_comment_returns_201_for_valid_input() {
         "Expected 201 Created for valid comment creation"
     );
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     assert_eq!(body["post_id"], post_id.to_string());
     assert_eq!(body["text"], "This is a test comment");
 }
@@ -120,7 +121,7 @@ async fn show_comments_for_post_returns_200_and_list() {
         "Expected 200 OK when fetching comments for existing post"
     );
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     let comments = body["comments"].as_array().unwrap();
     assert_eq!(comments.len(), 3);
     assert!(comments[0]["text"].is_string());
@@ -137,7 +138,7 @@ async fn show_comments_returns_empty_array_for_post_with_no_comments() {
     let response = app.get_comments(&post_id).await;
 
     assert_eq!(response.status().as_u16(), 200);
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     assert!(body["comments"].as_array().unwrap().is_empty());
 }
 
@@ -158,7 +159,7 @@ async fn delete_comment_returns_401_if_unauthenticated() {
     let resp = app.create_comment(&payload).await;
     assert_eq!(resp.status().as_u16(), 201);
 
-    let body: serde_json::Value = resp.json().await.unwrap();
+    let body: Value = resp.json().await.unwrap();
     let comment_id = Uuid::parse_str(body["id"].as_str().unwrap()).unwrap();
 
     app.logout().await;
@@ -184,7 +185,7 @@ async fn comment_can_only_be_deleted_by_creator_or_admin() {
         "post_id": post_id.to_string()
     });
     let resp = app.create_comment(&payload).await;
-    let body: serde_json::Value = resp.json().await.unwrap();
+    let body: Value = resp.json().await.unwrap();
     let comment_id = Uuid::parse_str(body["id"].as_str().unwrap()).unwrap();
     app.logout().await;
 
@@ -234,7 +235,7 @@ async fn delete_comment_removes_comment_successfully() {
     let resp = app.create_comment(&payload).await;
     assert_eq!(resp.status().as_u16(), 201);
 
-    let body: serde_json::Value = resp.json().await.unwrap();
+    let body: Value = resp.json().await.unwrap();
     let comment_id = Uuid::parse_str(body["id"].as_str().unwrap()).unwrap();
 
     let response = app.delete_comment(&comment_id).await;

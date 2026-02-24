@@ -9,6 +9,8 @@ use anyhow::Context;
 use secrecy::ExposeSecret;
 use secrecy::Secret;
 use sqlx::PgPool;
+use std::fmt;
+use std::fmt::{Debug, Formatter};
 use uuid::Uuid;
 
 #[derive(thiserror::Error)]
@@ -21,8 +23,8 @@ pub enum PasswordResetError {
     UnexpectedError(#[from] anyhow::Error),
 }
 
-impl std::fmt::Debug for PasswordResetError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Debug for PasswordResetError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         utils::error_chain_fmt(self, f)
     }
 }
@@ -85,7 +87,7 @@ pub async fn change_password(
         };
     }
 
-    crate::authentication::change_password(*user_id, new_password.into_secret(), &pool).await?;
+    authentication::change_password(*user_id, new_password.into_secret(), &pool).await?;
 
     Ok(HttpResponse::Ok().finish())
 }

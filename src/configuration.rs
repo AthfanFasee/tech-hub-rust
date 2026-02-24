@@ -1,9 +1,12 @@
 use crate::domain::UserEmail;
 use crate::email_client::EmailClient;
+use config::{Config, File};
 use secrecy::{ExposeSecret, Secret};
 use serde;
 use sqlx::postgres::PgConnectOptions;
 use sqlx::postgres::PgSslMode;
+use std::env;
+use std::time::Duration;
 use url::Url;
 
 #[derive(serde::Deserialize, Clone)]
@@ -30,8 +33,8 @@ impl EmailClientSettings {
         UserEmail::parse(self.sender_email.clone())
     }
 
-    pub fn timeout(&self) -> std::time::Duration {
-        std::time::Duration::from_millis(self.timeout_milliseconds)
+    pub fn timeout(&self) -> Duration {
+        Duration::from_millis(self.timeout_milliseconds)
     }
 }
 
@@ -62,23 +65,21 @@ pub struct ApplicationSettings {
 }
 
 pub fn get_config() -> Result<Configuration, config::ConfigError> {
-    let base_path = std::env::current_dir().expect("Failed to get current directory path");
+    let base_path = env::current_dir().expect("Failed to get current directory path");
     let config_directory = base_path.join("configuration");
 
     // Detect running environment
     // Default to local if unspecified
-    let environment: Environment = std::env::var("APP_ENVIRONMENT")
+    let environment: Environment = env::var("APP_ENVIRONMENT")
         .unwrap_or_else(|_| "local".into())
         .try_into()
         .expect("Failed to parse APP_ENVIRONMENT");
 
     let environment_filename = format!("{}.yaml", environment.as_str());
     // initialize config reader
-    let configs = config::Config::builder()
-        .add_source(config::File::from(config_directory.join("base.yaml")))
-        .add_source(config::File::from(
-            config_directory.join(environment_filename),
-        ))
+    let configs = Config::builder()
+        .add_source(File::from(config_directory.join("base.yaml")))
+        .add_source(File::from(config_directory.join(environment_filename)))
         .build()?;
 
     // convert the config values to config type

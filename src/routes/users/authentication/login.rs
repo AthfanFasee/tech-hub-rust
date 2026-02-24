@@ -7,6 +7,9 @@ use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, ResponseError, web};
 use anyhow::Context;
 use sqlx::PgPool;
+use std::fmt;
+use std::fmt::{Debug, Formatter};
+use tracing::Span;
 use uuid::Uuid;
 
 #[derive(thiserror::Error)]
@@ -17,8 +20,8 @@ pub enum LoginError {
     UnexpectedError(#[from] anyhow::Error),
 }
 
-impl std::fmt::Debug for LoginError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Debug for LoginError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         utils::error_chain_fmt(self, f)
     }
 }
@@ -49,7 +52,7 @@ pub async fn login(
         .try_into()
         .map_err(|_| LoginError::AuthError(anyhow::anyhow!("Invalid credentials")))?;
 
-    tracing::Span::current().record("user_name", tracing::field::display(&credentials.user_name));
+    Span::current().record("user_name", tracing::field::display(&credentials.user_name));
 
     let user_id = authentication::validate_credentials(credentials, &pool)
         .await

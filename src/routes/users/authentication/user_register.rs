@@ -11,6 +11,9 @@ use actix_web::{HttpResponse, web};
 use anyhow::Context;
 use secrecy::ExposeSecret;
 use sqlx::{Executor, PgPool, Postgres, Transaction};
+use std::fmt;
+use std::fmt::{Debug, Formatter};
+use tracing::{Span, field};
 use uuid::Uuid;
 
 #[derive(thiserror::Error)]
@@ -23,8 +26,8 @@ pub enum UserRegisterError {
     UnexpectedError(#[from] anyhow::Error),
 }
 
-impl std::fmt::Debug for UserRegisterError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Debug for UserRegisterError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         utils::error_chain_fmt(self, f)
     }
 }
@@ -63,8 +66,8 @@ pub async fn register_user(
         .try_into()
         .map_err(UserRegisterError::ValidationError)?;
 
-    tracing::Span::current().record("user_name", tracing::field::display(&name));
-    tracing::Span::current().record("user_email", tracing::field::display(&email));
+    Span::current().record("user_name", field::display(&name));
+    Span::current().record("user_email", field::display(&email));
 
     let mut transaction = pool
         .begin()
@@ -181,8 +184,8 @@ pub enum UserActivationError {
     UnexpectedError(#[from] anyhow::Error),
 }
 
-impl std::fmt::Debug for UserActivationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Debug for UserActivationError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         utils::error_chain_fmt(self, f)
     }
 }
@@ -210,7 +213,7 @@ pub async fn confirm_user_activation(
         .await?
         // Domain error (invalid token), so a new `UserConfirmError::UnknownToken` error is created as there's no existing error to wrap in an `anyhow::Error`
         .ok_or(UserActivationError::UnknownToken)?;
-    tracing::Span::current().record("user_id", tracing::field::display(user_id));
+    Span::current().record("user_id", field::display(user_id));
 
     activate_user_and_delete_token(&pool, user_id, &parameters.token).await?;
     Ok(HttpResponse::Ok().finish())

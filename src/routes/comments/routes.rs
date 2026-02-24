@@ -1,6 +1,6 @@
 use crate::authentication;
 use crate::routes;
-use actix_web::middleware::from_fn;
+use actix_web::middleware;
 use actix_web::web;
 
 pub fn comment_routes(cfg: &mut web::ServiceConfig) {
@@ -13,7 +13,7 @@ pub fn comment_routes(cfg: &mut web::ServiceConfig) {
         // Protected routes (require authentication)
         .service(
             web::scope("/me")
-                .wrap(from_fn(authentication::reject_anonymous_users))
+                .wrap(middleware::from_fn(authentication::reject_anonymous_users))
                 .route("/create", web::post().to(routes::create_comment))
                 .route("/delete/{id}", web::delete().to(routes::delete_comment)),
         );

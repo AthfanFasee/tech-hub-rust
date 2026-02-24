@@ -1,3 +1,5 @@
+use std::fmt;
+use std::fmt::{Display, Formatter};
 use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Debug)]
@@ -35,8 +37,98 @@ impl AsRef<str> for Title {
     }
 }
 
-impl std::fmt::Display for Title {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for Title {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Title;
+    use claims::{assert_err, assert_ok};
+    use proptest::prelude::*;
+
+    // Example-based tests
+    #[test]
+    fn empty_title_is_rejected() {
+        let result = Title::parse("".into());
+        assert_err!(result);
+    }
+
+    #[test]
+    fn long_title_is_rejected() {
+        let long_title = "a".repeat(101);
+        let result = Title::parse(long_title);
+        assert_err!(result);
+    }
+
+    #[test]
+    fn title_with_only_numbers_is_rejected() {
+        let result = Title::parse("12345".into());
+        assert_err!(result);
+    }
+
+    #[test]
+    fn title_with_only_numbers_and_spaces_is_rejected() {
+        let result = Title::parse("123 456".into());
+        assert_err!(result);
+    }
+
+    #[test]
+    fn title_with_numbers_and_letters_is_accepted() {
+        let result = Title::parse("Post123".into());
+        assert_ok!(result);
+    }
+
+    #[test]
+    fn title_with_letters_and_numbers_is_accepted() {
+        let result = Title::parse("123Post".into());
+        assert_ok!(result);
+    }
+
+    // Property-based tests
+    proptest! {
+        #[test]
+        fn valid_titles_with_valid_length_are_accepted(
+            title in r"[a-zA-Z][a-zA-Z0-9 ]{0,99}",
+        ) {
+            let result = Title::parse(title);
+            prop_assert!(result.is_ok());
+        }
+
+        #[test]
+        fn titles_longer_than_100_chars_are_rejected(
+            title in r"[a-zA-Z0-9]{101,150}",
+        ) {
+            let result = Title::parse(title);
+            prop_assert!(result.is_err());
+        }
+
+        #[test]
+        fn whitespace_only_titles_are_rejected(
+            title in r"\s{1,50}",
+        ) {
+            let result = Title::parse(title);
+            prop_assert!(result.is_err());
+        }
+
+        #[test]
+        fn numeric_only_titles_are_rejected(
+            title in r"[0-9]{1,50}",
+        ) {
+            let result = Title::parse(title);
+            prop_assert!(result.is_err());
+        }
+
+        #[test]
+        fn numeric_only_titles_with_spaces_are_rejected(
+            num1 in r"[0-9]{1,20}",
+            num2 in r"[0-9]{1,20}",
+        ) {
+            let title = format!("{} {}", num1, num2);
+            let result = Title::parse(title);
+            prop_assert!(result.is_err());
+        }
     }
 }

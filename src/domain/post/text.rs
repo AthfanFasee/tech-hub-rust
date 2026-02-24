@@ -1,3 +1,6 @@
+use std::fmt;
+use std::fmt::{Display, Formatter};
+
 #[derive(Debug)]
 pub struct Text(String);
 
@@ -23,8 +26,70 @@ impl AsRef<str> for Text {
     }
 }
 
-impl std::fmt::Display for Text {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for Text {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Text;
+    use claims::{assert_err, assert_ok};
+    use proptest::prelude::*;
+
+    // Example-based tests
+    #[test]
+    fn empty_text_is_rejected() {
+        let result = Text::parse("".into());
+        assert_err!(result);
+    }
+
+    #[test]
+    fn text_exceeding_max_length_is_rejected() {
+        let long_text = "a".repeat(10_001);
+        let result = Text::parse(long_text);
+        assert_err!(result);
+    }
+
+    #[test]
+    fn valid_text_is_accepted() {
+        let result = Text::parse("This is a valid post text with proper content.".into());
+        assert_ok!(result);
+    }
+
+    #[test]
+    fn text_at_max_length_is_accepted() {
+        let text = "a".repeat(10_000);
+        let result = Text::parse(text);
+        assert_ok!(result);
+    }
+
+    // Property-based tests
+    proptest! {
+        #[test]
+        fn whitespace_only_text_is_rejected(
+            text in r"\s{1,50}",
+        ) {
+            let result = Text::parse(text);
+            prop_assert!(result.is_err());
+        }
+
+        #[test]
+        fn text_content_within_limits_is_accepted(
+            content in r"[a-zA-Z0-9 .!?,]{10,1000}",
+        ) {
+            let result = Text::parse(content);
+            prop_assert!(result.is_ok());
+        }
+
+        #[test]
+        fn very_long_text_exceeding_limit_is_rejected(
+            size in 10_001..11_000_usize,
+        ) {
+            let text = "a".repeat(size);
+            let result = Text::parse(text);
+            prop_assert!(result.is_err());
+        }
     }
 }

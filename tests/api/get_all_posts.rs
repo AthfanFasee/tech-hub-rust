@@ -1,4 +1,7 @@
 use crate::helpers;
+use serde_json::Value;
+use tokio::time;
+use tokio::time::Duration;
 use uuid::Uuid;
 
 // ============================================================================
@@ -20,7 +23,7 @@ async fn get_all_posts_returns_posts_successfully() {
         "Expected 200 OK when fetching posts"
     );
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     assert!(body["posts"].is_array());
     assert!(body["metadata"].is_object());
     assert_eq!(body["posts"].as_array().unwrap().len(), 2);
@@ -43,7 +46,7 @@ async fn get_all_posts_works_without_authentication() {
         "Expected 200 OK when fetching posts without authentication"
     );
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     assert!(body["posts"].is_array());
 }
 
@@ -58,7 +61,7 @@ async fn get_all_posts_returns_empty_array_when_no_posts() {
         "Expected 200 OK even when no posts exist"
     );
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     assert_eq!(body["posts"].as_array().unwrap().len(), 0);
     assert_eq!(body["metadata"]["total_records"], 0);
 }
@@ -80,7 +83,7 @@ async fn get_all_posts_respects_pagination_limit() {
     let response = app.get_all_posts("?limit=2").await;
     assert_eq!(response.status().as_u16(), 200);
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     assert_eq!(
         body["posts"].as_array().unwrap().len(),
         2,
@@ -103,7 +106,7 @@ async fn get_all_posts_respects_page_parameter() {
     let response = app.get_all_posts("?limit=2&page=2").await;
     assert_eq!(response.status().as_u16(), 200);
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     assert_eq!(body["metadata"]["current_page"], 2);
     assert_eq!(body["posts"].as_array().unwrap().len(), 2);
 }
@@ -121,7 +124,7 @@ async fn get_all_posts_returns_correct_metadata() {
     let response = app.get_all_posts("?limit=3&page=1").await;
     assert_eq!(response.status().as_u16(), 200);
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     assert_eq!(body["metadata"]["current_page"], 1);
     assert_eq!(body["metadata"]["page_size"], 3);
     assert_eq!(body["metadata"]["first_page"], 1);
@@ -226,7 +229,7 @@ async fn get_all_posts_sorts_by_id_descending_by_default() {
     let response = app.get_all_posts("").await;
     assert_eq!(response.status().as_u16(), 200);
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     let posts = body["posts"].as_array().unwrap();
 
     // Default sort is -id, so the newest first
@@ -241,15 +244,15 @@ async fn get_all_posts_sorts_by_created_at_descending_by_default() {
     app.login().await;
 
     let id1 = app.create_sample_post_custom("First", "Content").await;
-    tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+    time::sleep(Duration::from_millis(10)).await;
     let id2 = app.create_sample_post_custom("Second", "Content").await;
-    tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+    time::sleep(Duration::from_millis(10)).await;
     let id3 = app.create_sample_post_custom("Third", "Content").await;
 
     let response = app.get_all_posts("").await;
     assert_eq!(response.status().as_u16(), 200);
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     let posts = body["posts"].as_array().unwrap();
 
     // Default sort is -created_at, so the newest first
@@ -270,7 +273,7 @@ async fn get_all_posts_sorts_by_title_ascending() {
     let response = app.get_all_posts("?sort=title").await;
     assert_eq!(response.status().as_u16(), 200);
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     let posts = body["posts"].as_array().unwrap();
 
     assert_eq!(posts[0]["title"], "Apple");
@@ -290,7 +293,7 @@ async fn get_all_posts_sorts_by_title_descending() {
     let response = app.get_all_posts("?sort=-title").await;
     assert_eq!(response.status().as_u16(), 200);
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     let posts = body["posts"].as_array().unwrap();
 
     assert_eq!(posts[0]["title"], "Zebra");
@@ -318,7 +321,7 @@ async fn get_all_posts_sorts_by_likes_count_descending() {
     let response = app.get_all_posts("?sort=-likescount").await;
     assert_eq!(response.status().as_u16(), 200);
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     let posts = body["posts"].as_array().unwrap();
 
     // Should be ordered by likes: post2 (1 like), post3 (1 like), post1 (0 likes)
@@ -352,7 +355,7 @@ async fn get_all_posts_filters_by_title() {
     let response = app.get_all_posts("?title=Rust").await;
     assert_eq!(response.status().as_u16(), 200);
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     let posts = body["posts"].as_array().unwrap();
 
     assert_eq!(posts.len(), 2, "Expected 2 posts matching 'Rust'");
@@ -372,7 +375,7 @@ async fn get_all_posts_title_search_is_case_insensitive() {
     let response = app.get_all_posts("?title=javascript").await;
     assert_eq!(response.status().as_u16(), 200);
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     let posts = body["posts"].as_array().unwrap();
 
     assert_eq!(posts.len(), 1);
@@ -390,7 +393,7 @@ async fn get_all_posts_returns_all_posts_when_title_is_empty() {
     let response = app.get_all_posts("?title=").await;
     assert_eq!(response.status().as_u16(), 200);
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     assert_eq!(body["posts"].as_array().unwrap().len(), 2);
 }
 
@@ -411,7 +414,7 @@ async fn get_all_posts_filters_by_creator_id() {
     let response = app.get_all_posts(&format!("?id={creator_id}")).await;
     assert_eq!(response.status().as_u16(), 200);
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     let posts = body["posts"].as_array().unwrap();
 
     assert_eq!(posts.len(), 2);
@@ -433,7 +436,7 @@ async fn get_all_posts_returns_empty_for_nonexistent_creator() {
     let response = app.get_all_posts(&format!("?id={random_id}")).await;
     assert_eq!(response.status().as_u16(), 200);
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     assert_eq!(body["posts"].as_array().unwrap().len(), 0);
 }
 
@@ -448,7 +451,7 @@ async fn get_all_posts_returns_all_posts_when_id_is_empty() {
     let response = app.get_all_posts("?id=").await;
     assert_eq!(response.status().as_u16(), 200);
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     assert_eq!(body["posts"].as_array().unwrap().len(), 2);
 }
 
@@ -474,7 +477,7 @@ async fn get_all_posts_excludes_soft_deleted_posts() {
     let response = app.get_all_posts("").await;
     assert_eq!(response.status().as_u16(), 200);
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     let posts = body["posts"].as_array().unwrap();
 
     assert_eq!(posts.len(), 1, "Expected only 1 active post");
@@ -496,7 +499,7 @@ async fn get_all_posts_returns_correct_post_structure() {
     let response = app.get_all_posts("").await;
     assert_eq!(response.status().as_u16(), 200);
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     let post = &body["posts"][0];
 
     // Verify all expected fields exist
@@ -534,7 +537,7 @@ async fn get_all_posts_combines_title_and_creator_filters() {
         .await;
     assert_eq!(response.status().as_u16(), 200);
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     let posts = body["posts"].as_array().unwrap();
 
     assert_eq!(posts.len(), 2, "Expected 2 Rust posts by this creator");
@@ -556,7 +559,7 @@ async fn get_all_posts_combines_filters_with_pagination_and_sorting() {
     let response = app.get_all_posts("?sort=title&limit=2&page=1").await;
     assert_eq!(response.status().as_u16(), 200);
 
-    let body: serde_json::Value = response.json().await.unwrap();
+    let body: Value = response.json().await.unwrap();
     let posts = body["posts"].as_array().unwrap();
 
     assert_eq!(posts.len(), 2);

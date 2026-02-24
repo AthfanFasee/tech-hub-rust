@@ -11,6 +11,9 @@ use anyhow::Context;
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use sqlx::PgPool;
+use std::fmt;
+use std::fmt::{Debug, Formatter};
+use tracing::Span;
 use uuid::Uuid;
 
 #[derive(thiserror::Error)]
@@ -31,8 +34,8 @@ pub enum PostError {
     UnexpectedError(#[from] anyhow::Error),
 }
 
-impl std::fmt::Debug for PostError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Debug for PostError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         utils::error_chain_fmt(self, f)
     }
 }
@@ -239,7 +242,7 @@ pub async fn insert_post_and_return_inserted_data(
     .fetch_one(pool)
     .await
     .context("Failed to insert new posts into database")?;
-    tracing::Span::current().record("post_id", tracing::field::display(&record.id));
+    Span::current().record("post_id", tracing::field::display(&record.id));
     Ok((record.id, record.created_at))
 }
 
@@ -273,7 +276,7 @@ pub async fn update_post(
     let user_id = user_id.into_inner();
     let is_admin = *is_admin.into_inner();
 
-    tracing::Span::current().record("user_id", tracing::field::display(&user_id));
+    Span::current().record("user_id", tracing::field::display(&user_id));
 
     // If not admin, verify ownership
     if !is_admin {

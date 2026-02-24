@@ -1,3 +1,5 @@
+use std::fmt;
+use std::fmt::{Display, Formatter};
 use validator::ValidateEmail;
 
 #[derive(Debug)]
@@ -37,8 +39,8 @@ impl AsRef<str> for UserEmail {
     }
 }
 
-impl std::fmt::Display for UserEmail {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for UserEmail {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         // Forward to the Display implementation of the wrapped String.
         self.0.fmt(f)
     }

@@ -1,5 +1,5 @@
 use crate::authentication::Credentials;
-use crate::domain::{NewUser, UserEmail, UserName, UserPassword};
+use crate::domain::{NewUser, UserName, UserPassword};
 use secrecy::{ExposeSecret, Secret};
 use serde::Deserialize;
 
@@ -36,13 +36,10 @@ impl TryFrom<UserData> for NewUser {
     type Error = String;
 
     fn try_from(payload: UserData) -> Result<Self, Self::Error> {
-        let user_name = UserName::parse(payload.user_name)?;
-        let email = UserEmail::parse(payload.email)?;
-        let password = UserPassword::parse(payload.password.expose_secret().to_string())?;
-        Ok(Self {
-            user_name,
-            email,
-            password,
-        })
+        NewUser::new(
+            payload.email,
+            payload.user_name,
+            payload.password.expose_secret().to_string(),
+        )
     }
 }

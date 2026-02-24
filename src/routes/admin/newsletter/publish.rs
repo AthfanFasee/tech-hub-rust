@@ -8,6 +8,8 @@ use actix_web::{HttpRequest, HttpResponse, ResponseError, web};
 use anyhow::Context;
 use sqlx::{Executor, PgPool};
 use sqlx::{Postgres, Transaction};
+use std::fmt;
+use std::fmt::{Debug, Formatter};
 use uuid::Uuid;
 
 #[derive(thiserror::Error)]
@@ -25,8 +27,8 @@ pub enum PublishError {
     UnexpectedError(#[from] anyhow::Error),
 }
 
-impl std::fmt::Debug for PublishError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Debug for PublishError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         utils::error_chain_fmt(self, f)
     }
 }

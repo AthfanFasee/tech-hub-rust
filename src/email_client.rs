@@ -1,6 +1,7 @@
 use crate::domain::UserEmail;
 use reqwest::{Client, Url};
 use secrecy::{ExposeSecret, Secret};
+use std::time::Duration;
 
 #[derive(Debug)]
 pub struct EmailClient {
@@ -34,7 +35,7 @@ impl EmailClient {
         base_url: Url,
         sender: UserEmail,
         authorization_token: Secret<String>,
-        timeout: std::time::Duration,
+        timeout: Duration,
     ) -> Self {
         let http_client = Client::builder().timeout(timeout).build().unwrap();
 
@@ -82,19 +83,21 @@ mod tests {
     use crate::domain::UserEmail;
     use crate::email_client::EmailClient;
     use claims::{assert_err, assert_ok};
-    use fake::faker::internet::en::SafeEmail;
-    use fake::faker::lorem::en::{Paragraph, Sentence};
+    use fake::faker::internet;
+    use fake::faker::lorem;
     use fake::{Fake, Faker};
     use reqwest::Url;
     use secrecy::Secret;
-    use wiremock::matchers::{any, header, header_exists, method, path};
+    use serde_json::Value;
+    use std::time::Duration;
+    use wiremock::matchers;
     use wiremock::{Match, Mock, MockServer, Request, ResponseTemplate};
 
     struct SendEmailBodyMatcher;
 
     impl Match for SendEmailBodyMatcher {
         fn matches(&self, request: &Request) -> bool {
-            let result: Result<serde_json::Value, _> = serde_json::from_slice(&request.body);
+            let result: Result<Value, _> = serde_json::from_slice(&request.body);
 
             if let Ok(body) = result {
                 body.get("From").is_some()
@@ -114,10 +117,10 @@ mod tests {
 
         let email_client = email_client(mock_server.uri());
 
-        Mock::given(header_exists("X-Postmark-Server-Token"))
-            .and(header("Content-Type", "application/json"))
-            .and(path("/email"))
-            .and(method("POST"))
+        Mock::given(matchers::header_exists("X-Postmark-Server-Token"))
+            .and(matchers::header("Content-Type", "application/json"))
+            .and(matchers::path("/email"))
+            .and(matchers::method("POST"))
             .and(SendEmailBodyMatcher)
             .respond_with(ResponseTemplate::new(200))
             .expect(1)
@@ -134,7 +137,7 @@ mod tests {
         let mock_server = MockServer::start().await;
         let email_client = email_client(mock_server.uri());
 
-        Mock::given(any())
+        Mock::given(matchers::any())
             .respond_with(ResponseTemplate::new(200))
             .expect(1)
             .mount(&mock_server)
@@ -152,7 +155,7 @@ mod tests {
         let mock_server = MockServer::start().await;
         let email_client = email_client(mock_server.uri());
 
-        Mock::given(any())
+        Mock::given(matchers::any())
             .respond_with(ResponseTemplate::new(500))
             .expect(1)
             .mount(&mock_server)
@@ -170,9 +173,9 @@ mod tests {
         let mock_server = MockServer::start().await;
         let email_client = email_client(mock_server.uri());
 
-        let response = ResponseTemplate::new(200).set_delay(std::time::Duration::from_secs(10));
+        let response = ResponseTemplate::new(200).set_delay(Duration::from_secs(10));
 
-        Mock::given(any())
+        Mock::given(matchers::any())
             .respond_with(response)
             .expect(1)
             .mount(&mock_server)
@@ -187,15 +190,15 @@ mod tests {
 
     // Generate a random email subject
     fn subject() -> String {
-        Sentence(1..2).fake()
+        lorem::en::Sentence(1..2).fake()
     }
     // Generate a random email content
     fn content() -> String {
-        Paragraph(1..10).fake()
+        lorem::en::Paragraph(1..10).fake()
     }
     // Generate a random subscriber email
     fn email() -> UserEmail {
-        UserEmail::parse(SafeEmail().fake()).unwrap()
+        UserEmail::parse(internet::en::SafeEmail().fake()).unwrap()
     }
 
     /// Get a test instance of `EmailClient`.
@@ -204,7 +207,7 @@ mod tests {
             Url::parse(&base_url).unwrap(),
             email(),
             Secret::new(Faker.fake()),
-            std::time::Duration::from_millis(200),
+            Duration::from_millis(200),
         )
     }
 }

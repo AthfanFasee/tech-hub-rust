@@ -1,6 +1,8 @@
 use html5ever::driver;
 use html5ever::tendril::TendrilSink;
 use markup5ever_rcdom::{Handle, NodeData, RcDom};
+use std::fmt;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug)]
 pub struct NewsletterHtml(String);
@@ -96,8 +98,149 @@ impl AsRef<str> for NewsletterHtml {
     }
 }
 
-impl std::fmt::Display for NewsletterHtml {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for NewsletterHtml {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::NewsletterHtml;
+    use claims::{assert_err, assert_ok};
+    use proptest::prelude::*;
+
+    // Example-based tests for Newsletter HTML
+    #[test]
+    fn empty_html_is_rejected() {
+        let result = NewsletterHtml::parse("".into());
+        assert_err!(result);
+    }
+
+    #[test]
+    fn whitespace_only_html_is_rejected() {
+        let result = NewsletterHtml::parse("   \n\t   ".into());
+        assert_err!(result);
+    }
+
+    #[test]
+    fn plain_text_without_html_tags_is_rejected() {
+        let result = NewsletterHtml::parse("This is just plain text without any HTML tags".into());
+        assert_err!(result);
+    }
+
+    #[test]
+    fn html_with_only_text_nodes_is_rejected() {
+        let result = NewsletterHtml::parse("Just some text, no tags at all!".into());
+        assert_err!(result);
+    }
+
+    #[test]
+    fn malformed_html_with_unclosed_tags_is_accepted() {
+        // html5ever is a forgiving HTML5 parser. It automatically closes unclosed tags
+        let result = NewsletterHtml::parse("<p>Content without closing tag".into());
+        assert_ok!(result);
+    }
+
+    #[test]
+    fn simple_html_tag_is_accepted() {
+        let result = NewsletterHtml::parse("<p>Content</p>".into());
+        assert_ok!(result);
+    }
+
+    #[test]
+    fn self_closing_html_tag_is_accepted() {
+        let result = NewsletterHtml::parse("<br />".into());
+        assert_ok!(result);
+    }
+
+    #[test]
+    fn html_with_attributes_is_accepted() {
+        let result = NewsletterHtml::parse(r#"<a href="https://example.com">Link</a>"#.into());
+        assert_ok!(result);
+    }
+
+    #[test]
+    fn html_with_nested_tags_is_accepted() {
+        let result = NewsletterHtml::parse("<div><p><strong>Bold text</strong></p></div>".into());
+        assert_ok!(result);
+    }
+
+    #[test]
+    fn html_with_special_characters_is_accepted() {
+        let result = NewsletterHtml::parse("<p>Price: &euro;10 &amp; &lt;more&gt;</p>".into());
+        assert_ok!(result);
+    }
+
+    #[test]
+    fn html_with_comments_is_accepted() {
+        let result = NewsletterHtml::parse("<!-- Comment --><p>Content</p>".into());
+        assert_ok!(result);
+    }
+
+    #[test]
+    fn html_exceeding_max_length_is_rejected() {
+        let long_html = format!("<p>{}</p>", "a".repeat(100_000));
+        let result = NewsletterHtml::parse(long_html);
+        assert_err!(result);
+    }
+
+    #[test]
+    fn valid_html_is_accepted() {
+        let result = NewsletterHtml::parse(
+            "<html><body><h1>Newsletter</h1><p>Content here</p></body></html>".into(),
+        );
+        assert_ok!(result);
+    }
+
+    #[test]
+    fn html_at_max_length_is_accepted() {
+        let content = "a".repeat(99_980);
+        let html = format!("<p>{}</p>", content);
+        let result = NewsletterHtml::parse(html);
+        assert_ok!(result);
+    }
+
+    #[test]
+    fn html_with_multiple_root_elements_is_accepted() {
+        let result = NewsletterHtml::parse("<p>First paragraph</p><p>Second paragraph</p>".into());
+        assert_ok!(result);
+    }
+
+    #[test]
+    fn html_with_doctype_is_accepted() {
+        let result =
+            NewsletterHtml::parse("<!DOCTYPE html><html><body><p>Content</p></body></html>".into());
+        assert_ok!(result);
+    }
+
+    // Property-based tests
+    proptest! {
+        #[test]
+        fn html_content_within_limits_is_accepted(
+            content in r"[a-zA-Z0-9<>/. ]{10,1000}",
+        ) {
+            let html = format!("<p>{}</p>", content);
+            let result = NewsletterHtml::parse(html);
+            prop_assert!(result.is_ok());
+        }
+
+        #[test]
+        fn whitespace_only_html_content_is_rejected(
+            html in r"\s{1,100}",
+        ) {
+            let result = NewsletterHtml::parse(html);
+            prop_assert!(result.is_err());
+        }
+
+        #[test]
+        fn very_long_html_exceeding_limit_is_rejected(
+            // Generate content that will exceed 100,000 chars
+            size in 100_001..110_000_usize,
+        ) {
+            let html = "a".repeat(size);
+            let result = NewsletterHtml::parse(html);
+            prop_assert!(result.is_err());
+        }
     }
 }

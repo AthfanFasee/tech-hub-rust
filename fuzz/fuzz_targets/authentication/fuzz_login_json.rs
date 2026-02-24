@@ -4,8 +4,8 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use serde_json::Value;
 use techhub::domain::{UserName, UserPassword};
+use Value;
 
 fuzz_target!(|data: &[u8]| {
     if let Ok(v) = serde_json::from_slice::<Value>(data) {

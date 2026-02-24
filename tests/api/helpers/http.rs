@@ -1,6 +1,6 @@
 use crate::helpers::{ConfirmationLinks, TestApp, TestUser};
 use linkify::{LinkFinder, LinkKind};
-use reqwest::{Response, header::HeaderMap};
+use reqwest::{Response, Url, header::HeaderMap};
 use serde_json::Value;
 use uuid::Uuid;
 use wiremock::matchers;
@@ -16,7 +16,7 @@ impl TestApp {
                 .filter(|l| *l.kind() == LinkKind::Url)
                 .collect();
             assert_eq!(links.len(), 1);
-            let mut link = reqwest::Url::parse(links[0].as_str()).unwrap();
+            let mut link = Url::parse(links[0].as_str()).unwrap();
             assert_eq!(link.host_str().unwrap(), "127.0.0.1");
             link.set_port(Some(self.port)).unwrap();
             link

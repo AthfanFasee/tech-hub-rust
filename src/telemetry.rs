@@ -1,6 +1,7 @@
 use std::io::{self, Write};
+use tokio::task;
 use tokio::task::JoinHandle;
-use tracing::{Subscriber, subscriber};
+use tracing::{Span, Subscriber, subscriber};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_log::LogTracer;
 use tracing_subscriber::{EnvFilter, Registry, fmt::MakeWriter, layer::SubscriberExt};
@@ -76,6 +77,6 @@ where
     F: FnOnce() -> R + Send + 'static,
     R: Send + 'static,
 {
-    let current_span = tracing::Span::current();
-    tokio::task::spawn_blocking(move || current_span.in_scope(f))
+    let current_span = Span::current();
+    task::spawn_blocking(move || current_span.in_scope(f))
 }

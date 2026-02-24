@@ -5,14 +5,16 @@ use actix_web::dev::{ServiceRequest, ServiceResponse};
 use actix_web::http::StatusCode;
 use actix_web::middleware::Next;
 use actix_web::{FromRequest, HttpMessage};
+use std::fmt;
+use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use uuid::Uuid;
 
 #[derive(Copy, Clone, Debug)]
 pub struct UserId(Uuid);
 
-impl std::fmt::Display for UserId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for UserId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }
 }
@@ -28,8 +30,8 @@ impl Deref for UserId {
 #[derive(Copy, Clone, Debug)]
 pub struct IsAdmin(bool);
 
-impl std::fmt::Display for IsAdmin {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for IsAdmin {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }
 }

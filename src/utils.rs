@@ -1,8 +1,9 @@
 use actix_web::{HttpResponse, error, http::StatusCode};
 use rand::{Rng, distributions::Alphanumeric};
-use serde::Serialize;
+use std::fmt::{Debug, Display, Formatter};
+use std::{fmt, iter};
 
-#[derive(Serialize)]
+#[derive(serde::Serialize)]
 pub struct ErrorResponse {
     pub code: u16,
     pub message: String,
@@ -16,10 +17,7 @@ pub fn build_error_response(status_code: StatusCode, message: String) -> HttpRes
     HttpResponse::build(status_code).json(error_response)
 }
 
-pub fn error_chain_fmt(
-    e: &dyn std::error::Error,
-    f: &mut std::fmt::Formatter<'_>,
-) -> std::fmt::Result {
+pub fn error_chain_fmt(e: &dyn std::error::Error, f: &mut Formatter<'_>) -> fmt::Result {
     writeln!(f, "{e}")?;
 
     let mut current = e.source();
@@ -37,7 +35,7 @@ pub fn error_chain_fmt(
 
 pub fn generate_token() -> String {
     let mut rng = rand::thread_rng();
-    std::iter::repeat_with(|| rng.sample(Alphanumeric))
+    iter::repeat_with(|| rng.sample(Alphanumeric))
         .map(char::from)
         .take(25)
         .collect()
@@ -46,7 +44,7 @@ pub fn generate_token() -> String {
 // Generic error helper that wraps any error into an appropriate Actix error while preserving root causes
 pub fn app_error<T>(status: StatusCode, e: T) -> actix_web::Error
 where
-    T: std::fmt::Debug + std::fmt::Display + 'static,
+    T: Debug + Display + 'static,
 {
     match status {
         StatusCode::BAD_REQUEST => error::ErrorBadRequest(e),

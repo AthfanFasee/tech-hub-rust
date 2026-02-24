@@ -1,6 +1,6 @@
 use crate::authentication;
 use crate::routes;
-use actix_web::middleware::from_fn;
+use actix_web::middleware;
 use actix_web::web;
 
 pub fn user_routes(cfg: &mut web::ServiceConfig) {
@@ -16,7 +16,7 @@ pub fn user_routes(cfg: &mut web::ServiceConfig) {
         // Protected routes (require authentication)
         .service(
             web::scope("/me")
-                .wrap(from_fn(authentication::reject_anonymous_users))
+                .wrap(middleware::from_fn(authentication::reject_anonymous_users))
                 .route("/reset-password", web::post().to(routes::change_password))
                 .route("/logout", web::post().to(routes::log_out))
                 .route(

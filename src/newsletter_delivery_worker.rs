@@ -7,6 +7,7 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use sqlx::{Executor, PgPool, Postgres, Transaction};
 use std::ops::DerefMut;
+use tokio::time;
 use tokio::time::Duration;
 use tracing::{Span, field};
 use uuid::Uuid;
@@ -40,7 +41,7 @@ async fn worker_loop(pool: PgPool, email_client: EmailClient) -> Result<(), anyh
             // This random jitter will ensure multiple instances of app won't clean db at same time
             // Nonetheless a delete statement is concurrency safe in db
             let jitter = rng.gen_range(0..=3600);
-            tokio::time::sleep(Duration::from_secs(24 * 3600 + jitter)).await;
+            time::sleep(Duration::from_secs(24 * 3600 + jitter)).await;
         }
     });
 
@@ -54,7 +55,7 @@ async fn worker_loop(pool: PgPool, email_client: EmailClient) -> Result<(), anyh
             Ok(ExecutionOutcome::EmptyQueue) => {
                 // Zero pending tasks hence sleep longer, reset backoff
                 backoff_secs = 1;
-                tokio::time::sleep(Duration::from_secs(600)).await;
+                time::sleep(Duration::from_secs(600)).await;
             }
 
             Ok(ExecutionOutcome::TaskCompleted) => {
@@ -72,7 +73,7 @@ async fn worker_loop(pool: PgPool, email_client: EmailClient) -> Result<(), anyh
                 // Add 0–20% random jitter to avoid sync storms
                 let jitter = rng.gen_range(0.0..=0.2);
                 let sleep_duration = Duration::from_secs_f64(backoff_secs as f64 * (1.0 + jitter));
-                tokio::time::sleep(sleep_duration).await;
+                time::sleep(sleep_duration).await;
 
                 // exponential backoff, capped at 120s
                 backoff_secs = (backoff_secs * 2).min(120);

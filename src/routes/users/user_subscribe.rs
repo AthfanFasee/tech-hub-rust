@@ -8,6 +8,9 @@ use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, ResponseError, web};
 use anyhow::Context;
 use sqlx::PgPool;
+use std::fmt;
+use std::fmt::{Debug, Formatter};
+use tracing::{Span, field};
 use uuid::Uuid;
 
 #[derive(serde::Deserialize)]
@@ -27,8 +30,8 @@ pub enum UserSubscribeError {
     UnexpectedError(#[from] anyhow::Error),
 }
 
-impl std::fmt::Debug for UserSubscribeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Debug for UserSubscribeError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         utils::error_chain_fmt(self, f)
     }
 }
@@ -57,7 +60,7 @@ pub async fn subscribe_user(
         .await?
         // Domain error (invalid token), so a new `UserConfirmError::UnknownToken` error is created instead of wrapping an `anyhow::Error`
         .ok_or(UserSubscribeError::UnknownToken)?;
-    tracing::Span::current().record("user_id", tracing::field::display(user_id));
+    Span::current().record("user_id", field::display(user_id));
 
     subscribe_user_and_delete_token(&pool, user_id, &parameters.token).await?;
     Ok(HttpResponse::Ok().finish())
