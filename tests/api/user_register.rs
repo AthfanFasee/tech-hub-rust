@@ -31,9 +31,9 @@ async fn register_user_persists_new_user_and_returns_200_for_valid_data() {
         "#,
         user.email,
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Failed to fetch saved user data.");
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to fetch saved user data.");
 
     assert_eq!(saved.email, user.email);
     assert_eq!(saved.user_name, user.user_name);
@@ -256,9 +256,9 @@ async fn confirmation_link_via_email_activates_a_user() {
         "#,
         user.email,
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Failed to fetch saved user data.");
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to fetch saved user data.");
 
     assert_eq!(saved.email, user.email);
     assert_eq!(saved.user_name, user.user_name);
@@ -283,8 +283,8 @@ async fn confirm_user_activation_returns_401_for_invalid_activation_token() {
         "{}/v1/user/confirm/register?token=not-a-real-token",
         app.address
     ))
-    .await
-    .unwrap();
+        .await
+        .unwrap();
     assert_eq!(response.status().as_u16(), 401);
 }
 
@@ -320,9 +320,9 @@ async fn confirm_user_activation_deletes_activation_token_after_successful_confi
         r#"SELECT COUNT(*) as count FROM tokens WHERE user_id = $1 AND is_activation = true"#,
         app.test_user.user_id,
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .unwrap();
+        .fetch_one(&app.db_pool)
+        .await
+        .unwrap();
 
     assert_eq!(remaining_tokens.count, Some(0));
 }
