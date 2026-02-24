@@ -1,5 +1,4 @@
-use crate::helpers::spawn_app;
-use serde_json::json;
+use crate::helpers;
 use sqlx::query;
 use uuid::Uuid;
 
@@ -9,9 +8,9 @@ use uuid::Uuid;
 
 #[tokio::test]
 async fn user_must_be_logged_in_to_create_post() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
-    let payload = json!({
+    let payload = serde_json::json!({
         "title": "Some title",
         "text": "Post content here...",
         "img": "https://example.com/image.jpg"
@@ -28,14 +27,14 @@ async fn user_must_be_logged_in_to_create_post() {
 
 #[tokio::test]
 async fn create_post_returns_400_for_invalid_payload() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let invalid_payloads = vec![
-        json!({ "title": "", "text": "Some text", "img": "https://example.com/image.jpg" }),
-        json!({ "title": "Title", "text": "", "img": "https://example.com/image.jpg" }),
-        json!({ "title": "Title", "text": "Text", "img": "" }),
-        json!({}),
+        serde_json::json!({ "title": "", "text": "Some text", "img": "https://example.com/image.jpg" }),
+        serde_json::json!({ "title": "Title", "text": "", "img": "https://example.com/image.jpg" }),
+        serde_json::json!({ "title": "Title", "text": "Text", "img": "" }),
+        serde_json::json!({}),
     ];
 
     for payload in invalid_payloads {
@@ -50,10 +49,10 @@ async fn create_post_returns_400_for_invalid_payload() {
 
 #[tokio::test]
 async fn create_post_persists_valid_post_and_returns_201() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
-    let payload = json!({
+    let payload = serde_json::json!({
         "title": "My first blog posts",
         "text": "This is a test posts",
         "img": "https://example.com/img.jpg"
@@ -87,9 +86,9 @@ async fn create_post_persists_valid_post_and_returns_201() {
         "#,
         "My first blog posts"
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Failed to fetch saved posts.");
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to fetch saved posts.");
 
     assert_eq!(saved.title, "My first blog posts");
     assert_eq!(saved.post_text, "This is a test posts");
@@ -107,10 +106,10 @@ async fn create_post_persists_valid_post_and_returns_201() {
 
 #[tokio::test]
 async fn user_must_be_logged_in_to_update_post() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     let post_id = Uuid::new_v4();
 
-    let payload = json!({
+    let payload = serde_json::json!({
         "title": "Updated title",
         "text": "Updated content",
         "img": "https://example.com/updated.jpg"
@@ -127,7 +126,7 @@ async fn user_must_be_logged_in_to_update_post() {
 
 #[tokio::test]
 async fn non_creator_non_admin_cannot_update_post() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
@@ -137,7 +136,7 @@ async fn non_creator_non_admin_cannot_update_post() {
     let payload_user = app.create_activated_user().await;
     app.login_with(&payload_user).await;
 
-    let payload = json!({
+    let payload = serde_json::json!({
         "title": "Hacked title",
         "text": "Hacked text",
         "img": "https://example.com/hacked.jpg"
@@ -154,7 +153,7 @@ async fn non_creator_non_admin_cannot_update_post() {
 
 #[tokio::test]
 async fn admin_can_update_post_created_by_someone_else() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
@@ -162,7 +161,7 @@ async fn admin_can_update_post_created_by_someone_else() {
 
     app.login_admin().await;
 
-    let payload = json!({
+    let payload = serde_json::json!({
         "title": "Admin Updated",
         "text": "Admin text",
         "img": "https://example.com/admin.jpg"
@@ -178,11 +177,11 @@ async fn admin_can_update_post_created_by_someone_else() {
 
 #[tokio::test]
 async fn update_post_returns_403_for_nonexistent_id_when_unauthorized() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     app.login().await; // normal user
 
-    let payload = json!({
+    let payload = serde_json::json!({
         "title": "Updated title",
         "text": "Updated text",
         "img": "https://example.com/updated.jpg"
@@ -199,10 +198,10 @@ async fn update_post_returns_403_for_nonexistent_id_when_unauthorized() {
 
 #[tokio::test]
 async fn update_post_returns_404_for_nonexistent_id_when_authorized() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login_admin().await;
 
-    let payload = json!({
+    let payload = serde_json::json!({
         "title": "Updated title",
         "text": "Updated text",
         "img": "https://example.com/updated.jpg"
@@ -219,16 +218,16 @@ async fn update_post_returns_404_for_nonexistent_id_when_authorized() {
 
 #[tokio::test]
 async fn update_post_returns_400_for_invalid_payload() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
 
     let invalid_payloads = vec![
-        json!({ "title": "", "text": "Some text", "img": "https://example.com/img.jpg" }),
-        json!({ "title": "Title", "text": "", "img": "https://example.com/img.jpg" }),
-        json!({ "title": "Title", "text": "Text", "img": "" }),
-        json!({}),
+        serde_json::json!({ "title": "", "text": "Some text", "img": "https://example.com/img.jpg" }),
+        serde_json::json!({ "title": "Title", "text": "", "img": "https://example.com/img.jpg" }),
+        serde_json::json!({ "title": "Title", "text": "Text", "img": "" }),
+        serde_json::json!({}),
     ];
 
     for payload in invalid_payloads {
@@ -244,12 +243,12 @@ async fn update_post_returns_400_for_invalid_payload() {
 
 #[tokio::test]
 async fn update_post_persists_changes_and_returns_200() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
 
-    let payload = json!({
+    let payload = serde_json::json!({
         "title": "Updated Title",
         "text": "Updated posts content",
         "img": "https://example.com/updated.jpg"
@@ -273,9 +272,9 @@ async fn update_post_persists_changes_and_returns_200() {
         "#,
         post_id
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Failed to fetch updated posts");
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to fetch updated posts");
 
     assert_eq!(record.title, "Updated Title");
     assert_eq!(record.post_text, "Updated posts content");
@@ -289,7 +288,7 @@ async fn update_post_persists_changes_and_returns_200() {
 
 #[tokio::test]
 async fn delete_post_marks_post_as_deleted() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
@@ -314,7 +313,7 @@ async fn delete_post_marks_post_as_deleted() {
 
 #[tokio::test]
 async fn post_can_only_be_deleted_by_creator_or_an_admin() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
@@ -354,7 +353,7 @@ async fn post_can_only_be_deleted_by_creator_or_an_admin() {
 
 #[tokio::test]
 async fn forbidden_delete_post_request_does_not_leak_ownership_information() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
@@ -393,7 +392,7 @@ async fn forbidden_delete_post_request_does_not_leak_ownership_information() {
 
 #[tokio::test]
 async fn delete_post_returns_404_for_nonexistent_id_for_admin() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login_admin().await;
 
     let random_id = Uuid::new_v4();
@@ -408,7 +407,7 @@ async fn delete_post_returns_404_for_nonexistent_id_for_admin() {
 
 #[tokio::test]
 async fn delete_post_returns_403_for_nonexistent_id_for_non_admin_user() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let random_id = Uuid::new_v4();
@@ -423,7 +422,7 @@ async fn delete_post_returns_403_for_nonexistent_id_for_non_admin_user() {
 
 #[tokio::test]
 async fn delete_post_returns_404_if_already_deleted() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login_admin().await;
 
     let post_id = app.create_sample_post().await;
@@ -440,7 +439,7 @@ async fn delete_post_returns_404_if_already_deleted() {
 
 #[tokio::test]
 async fn delete_post_requires_authentication() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     let random_id = Uuid::new_v4();
     let response = app.delete_post(&random_id).await;
@@ -458,7 +457,7 @@ async fn delete_post_requires_authentication() {
 
 #[tokio::test]
 async fn hard_delete_post_removes_from_database() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login_admin().await;
 
     let post_id = app.create_sample_post().await;
@@ -483,7 +482,7 @@ async fn hard_delete_post_removes_from_database() {
 
 #[tokio::test]
 async fn hard_delete_requires_admin_privileges() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
@@ -505,7 +504,7 @@ async fn hard_delete_requires_admin_privileges() {
 
 #[tokio::test]
 async fn hard_delete_returns_404_for_nonexistent_post() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login_admin().await;
 
     let random_id = Uuid::new_v4();
@@ -524,7 +523,7 @@ async fn hard_delete_returns_404_for_nonexistent_post() {
 
 #[tokio::test]
 async fn like_post_adds_user_to_liked_by() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
@@ -541,9 +540,9 @@ async fn like_post_adds_user_to_liked_by() {
         "#,
         post_id
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Failed to fetch posts after like");
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to fetch posts after like");
 
     assert!(
         record.liked_by.contains(&user_id),
@@ -553,7 +552,7 @@ async fn like_post_adds_user_to_liked_by() {
 
 #[tokio::test]
 async fn like_post_is_idempotent_for_same_user() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
@@ -571,9 +570,9 @@ async fn like_post_is_idempotent_for_same_user() {
         "#,
         post_id
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Failed to fetch posts after like");
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to fetch posts after like");
 
     let count = record.liked_by.iter().filter(|&&id| id == user_id).count();
 
@@ -582,7 +581,7 @@ async fn like_post_is_idempotent_for_same_user() {
 
 #[tokio::test]
 async fn like_post_returns_404_for_nonexistent_post() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let random_id = Uuid::new_v4();
@@ -597,7 +596,7 @@ async fn like_post_returns_404_for_nonexistent_post() {
 
 #[tokio::test]
 async fn like_post_returns_401_if_unauthenticated() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
@@ -617,7 +616,7 @@ async fn like_post_returns_401_if_unauthenticated() {
 
 #[tokio::test]
 async fn dislike_post_removes_user_from_liked_by() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
@@ -636,9 +635,9 @@ async fn dislike_post_removes_user_from_liked_by() {
         "#,
         post_id
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Failed to fetch posts after dislike");
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to fetch posts after dislike");
 
     assert!(
         !record.liked_by.contains(&user_id),
@@ -648,7 +647,7 @@ async fn dislike_post_removes_user_from_liked_by() {
 
 #[tokio::test]
 async fn dislike_post_returns_404_for_nonexistent_post() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let random_id = Uuid::new_v4();
@@ -663,7 +662,7 @@ async fn dislike_post_returns_404_for_nonexistent_post() {
 
 #[tokio::test]
 async fn dislike_post_returns_401_if_unauthenticated() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
@@ -683,7 +682,7 @@ async fn dislike_post_returns_401_if_unauthenticated() {
 
 #[tokio::test]
 async fn get_post_returns_post_data_successfully() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
@@ -701,7 +700,7 @@ async fn get_post_returns_post_data_successfully() {
 
 #[tokio::test]
 async fn get_post_returns_404_for_nonexistent_post() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let random_id = Uuid::new_v4();
@@ -715,7 +714,7 @@ async fn get_post_returns_404_for_nonexistent_post() {
 
 #[tokio::test]
 async fn get_post_does_return_200_if_unauthenticated() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
@@ -731,7 +730,7 @@ async fn get_post_does_return_200_if_unauthenticated() {
 
 #[tokio::test]
 async fn get_post_does_not_return_deleted_posts() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
@@ -745,9 +744,9 @@ async fn get_post_does_not_return_deleted_posts() {
         "#,
         post_id
     )
-    .execute(&app.db_pool)
-    .await
-    .expect("Failed to soft delete posts");
+        .execute(&app.db_pool)
+        .await
+        .expect("Failed to soft delete posts");
 
     let response = app.get_post(&post_id).await;
 

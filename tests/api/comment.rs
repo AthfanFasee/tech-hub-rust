@@ -1,5 +1,4 @@
-use crate::helpers::spawn_app;
-use serde_json::json;
+use crate::helpers;
 use sqlx::query;
 use uuid::Uuid;
 
@@ -9,12 +8,12 @@ use uuid::Uuid;
 
 #[tokio::test]
 async fn create_comment_returns_201_for_valid_input() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
 
-    let payload = json!({
+    let payload = serde_json::json!({
         "text": "This is a test comment",
         "post_id": post_id.to_string()
     });
@@ -33,10 +32,10 @@ async fn create_comment_returns_201_for_valid_input() {
 
 #[tokio::test]
 async fn create_comment_returns_400_for_invalid_post_id() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
-    let payload = json!({
+    let payload = serde_json::json!({
         "text": "Invalid posts id test",
         "post_id": "not-a-uuid"
     });
@@ -52,12 +51,12 @@ async fn create_comment_returns_400_for_invalid_post_id() {
 
 #[tokio::test]
 async fn create_comment_returns_400_for_empty_text() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
 
-    let payload = json!({
+    let payload = serde_json::json!({
         "text": "",
         "post_id": post_id.to_string()
     });
@@ -72,13 +71,13 @@ async fn create_comment_returns_400_for_empty_text() {
 
 #[tokio::test]
 async fn create_comment_returns_401_if_unauthenticated() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
     app.logout().await;
 
-    let payload = json!({
+    let payload = serde_json::json!({
         "text": "Comment without login",
         "post_id": post_id.to_string()
     });
@@ -98,13 +97,13 @@ async fn create_comment_returns_401_if_unauthenticated() {
 
 #[tokio::test]
 async fn show_comments_for_post_returns_200_and_list() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
 
     for i in 0..3 {
-        let payload = json!({
+        let payload = serde_json::json!({
             "text": format!("Comment {}", i),
             "post_id": post_id.to_string()
         });
@@ -129,7 +128,7 @@ async fn show_comments_for_post_returns_200_and_list() {
 
 #[tokio::test]
 async fn show_comments_returns_empty_array_for_post_with_no_comments() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
@@ -148,11 +147,11 @@ async fn show_comments_returns_empty_array_for_post_with_no_comments() {
 
 #[tokio::test]
 async fn delete_comment_returns_401_if_unauthenticated() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
-    let payload = json!({
+    let payload = serde_json::json!({
         "text": "To test unauthorized delete",
         "post_id": post_id.to_string()
     });
@@ -174,13 +173,13 @@ async fn delete_comment_returns_401_if_unauthenticated() {
 
 #[tokio::test]
 async fn comment_can_only_be_deleted_by_creator_or_admin() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
 
     // User A creates comment
-    let payload = json!({
+    let payload = serde_json::json!({
         "text": "Comment A",
         "post_id": post_id.to_string()
     });
@@ -214,21 +213,21 @@ async fn comment_can_only_be_deleted_by_creator_or_admin() {
         "SELECT COUNT(*) AS count FROM comments WHERE id = $1",
         comment_id
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Failed to check DB");
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to check DB");
 
     assert_eq!(record.count.unwrap(), 0, "Comment should be deleted");
 }
 
 #[tokio::test]
 async fn delete_comment_removes_comment_successfully() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post_id = app.create_sample_post().await;
 
-    let payload = json!({
+    let payload = serde_json::json!({
         "text": "To be deleted",
         "post_id": post_id.to_string()
     });
@@ -245,16 +244,16 @@ async fn delete_comment_removes_comment_successfully() {
         "SELECT COUNT(*) AS count FROM comments WHERE id = $1",
         comment_id
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Failed to check DB");
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to check DB");
 
     assert_eq!(record.count.unwrap(), 0);
 }
 
 #[tokio::test]
 async fn delete_comment_returns_404_for_nonexistent_comment_when_authorized() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login_admin().await;
 
     let random_id = Uuid::new_v4();
@@ -269,7 +268,7 @@ async fn delete_comment_returns_404_for_nonexistent_comment_when_authorized() {
 
 #[tokio::test]
 async fn delete_comment_does_not_leak_existence_information() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     let random_comment = Uuid::new_v4();
 
     let user_b = app.create_activated_user().await;

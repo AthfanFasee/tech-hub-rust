@@ -1,7 +1,8 @@
 use crate::helpers::TestApp;
 use reqwest::{Response, header::HeaderMap};
 use serde_json::Value;
-use techhub::newsletter_delivery_worker::{ExecutionOutcome, try_execute_task};
+use techhub::newsletter_delivery_worker::{ExecutionOutcome};
+use techhub::newsletter_delivery_worker;
 
 impl TestApp {
     pub async fn login_admin(&self) {
@@ -33,7 +34,7 @@ impl TestApp {
     pub async fn dispatch_all_pending_newsletter_emails(&self) {
         loop {
             if let ExecutionOutcome::EmptyQueue =
-                try_execute_task(&self.db_pool, &self.email_client)
+                newsletter_delivery_worker::try_execute_task(&self.db_pool, &self.email_client)
                     .await
                     .unwrap()
             {

@@ -1,8 +1,8 @@
-use crate::authentication::AuthError;
-use crate::authentication::{Credentials, validate_credentials};
+use crate::authentication;
+use crate::authentication::{Credentials, AuthError};
 use crate::domain::LoginData;
 use crate::session_state::TypedSession;
-use crate::{build_error_response, error_chain_fmt};
+use crate::utils;
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, ResponseError, web};
 use anyhow::Context;
@@ -19,7 +19,7 @@ pub enum LoginError {
 
 impl std::fmt::Debug for LoginError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        error_chain_fmt(self, f)
+        utils::error_chain_fmt(self, f)
     }
 }
 
@@ -30,7 +30,7 @@ impl ResponseError for LoginError {
             LoginError::AuthError(_) => StatusCode::UNAUTHORIZED,
         };
 
-        build_error_response(status_code, self.to_string())
+        utils::build_error_response(status_code, self.to_string())
     }
 }
 
@@ -51,7 +51,7 @@ pub async fn login(
 
     tracing::Span::current().record("user_name", tracing::field::display(&credentials.user_name));
 
-    let user_id = validate_credentials(credentials, &pool)
+    let user_id = authentication::validate_credentials(credentials, &pool)
         .await
         .map_err(|e| match e {
             AuthError::InvalidCredentials(_) => LoginError::AuthError(e.into()),

@@ -1,5 +1,5 @@
-use crate::app_error;
 use crate::session_state::TypedSession;
+use crate::utils;
 use actix_web::body::MessageBody;
 use actix_web::dev::{ServiceRequest, ServiceResponse};
 use actix_web::http::StatusCode;
@@ -54,13 +54,13 @@ pub async fn reject_anonymous_users(
 
     let user_id = session
         .get_user_id()
-        .map_err(|e| app_error(StatusCode::INTERNAL_SERVER_ERROR, e))?
-        .ok_or_else(|| app_error(StatusCode::UNAUTHORIZED, "User has not logged in"))?;
+        .map_err(|e| utils::app_error(StatusCode::INTERNAL_SERVER_ERROR, e))?
+        .ok_or_else(|| utils::app_error(StatusCode::UNAUTHORIZED, "User has not logged in"))?;
 
     let is_admin = session
         .get_is_admin()
-        .map_err(|e| app_error(StatusCode::INTERNAL_SERVER_ERROR, e))?
-        .ok_or_else(|| app_error(StatusCode::UNAUTHORIZED, "User has not logged in"))?;
+        .map_err(|e| utils::app_error(StatusCode::INTERNAL_SERVER_ERROR, e))?
+        .ok_or_else(|| utils::app_error(StatusCode::UNAUTHORIZED, "User has not logged in"))?;
 
     req.extensions_mut().insert(UserId(user_id));
     req.extensions_mut().insert(IsAdmin(is_admin));
@@ -79,16 +79,16 @@ pub async fn reject_non_admin_users(
 
     let user_id = session
         .get_user_id()
-        .map_err(|e| app_error(StatusCode::INTERNAL_SERVER_ERROR, e))?
-        .ok_or_else(|| app_error(StatusCode::UNAUTHORIZED, "User has not logged in"))?;
+        .map_err(|e| utils::app_error(StatusCode::INTERNAL_SERVER_ERROR, e))?
+        .ok_or_else(|| utils::app_error(StatusCode::UNAUTHORIZED, "User has not logged in"))?;
 
     let is_admin = session
         .get_is_admin()
-        .map_err(|e| app_error(StatusCode::INTERNAL_SERVER_ERROR, e))?
-        .ok_or_else(|| app_error(StatusCode::UNAUTHORIZED, "Missing admin flag in session"))?;
+        .map_err(|e| utils::app_error(StatusCode::INTERNAL_SERVER_ERROR, e))?
+        .ok_or_else(|| utils::app_error(StatusCode::UNAUTHORIZED, "Missing admin flag in session"))?;
 
     if !is_admin {
-        return Err(app_error(
+        return Err(utils::app_error(
             StatusCode::FORBIDDEN,
             "Admin privileges required",
         ));

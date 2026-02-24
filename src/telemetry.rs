@@ -1,11 +1,9 @@
 use std::io::{self, Write};
 use tokio::task::JoinHandle;
-use tracing::Subscriber;
-use tracing::subscriber::set_global_default;
+use tracing::{subscriber, Subscriber};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_log::LogTracer;
-use tracing_subscriber::fmt::MakeWriter;
-use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt};
+use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt, fmt::MakeWriter};
 
 pub fn get_subscriber<Sink>(
     name: String,
@@ -33,7 +31,7 @@ where
 // `init_subscriber` should only be called once!
 pub fn init_subscriber(subscriber: impl Subscriber + Send + Sync) {
     LogTracer::init().expect("Failed to set logger");
-    set_global_default(subscriber).expect("Failed to set subscriber");
+    subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
 }
 
 // NewlineWriter: A wrapper that adds \n after every write

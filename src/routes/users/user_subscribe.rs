@@ -1,12 +1,11 @@
 use crate::authentication::UserId;
 use crate::domain::UserEmail;
 use crate::email_client::{EmailClient, EmailError};
-use crate::routes::get_user_id_from_token;
+use crate::routes::users::authentication::user_register;
 use crate::startup::ApplicationBaseUrl;
-use crate::utils::generate_token;
-use crate::{build_error_response, error_chain_fmt};
+use crate::utils;
 use actix_web::http::StatusCode;
-use actix_web::{HttpResponse, ResponseError, web};
+use actix_web::{web, HttpResponse, ResponseError};
 use anyhow::Context;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -30,7 +29,7 @@ pub enum UserSubscribeError {
 
 impl std::fmt::Debug for UserSubscribeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        error_chain_fmt(self, f)
+        utils::error_chain_fmt(self, f)
     }
 }
 
@@ -41,7 +40,8 @@ impl ResponseError for UserSubscribeError {
             UserSubscribeError::UnknownToken => StatusCode::UNAUTHORIZED,
             UserSubscribeError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
-        build_error_response(status_code, self.to_string())
+
+        utils::build_error_response(status_code, self.to_string())
     }
 }
 
@@ -53,7 +53,7 @@ pub async fn subscribe_user(
     parameters: web::Query<SubscribeParameters>,
     pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, UserSubscribeError> {
-    let user_id = get_user_id_from_token(&pool, &parameters.token)
+    let user_id = user_register::get_user_id_from_token(&pool, &parameters.token)
         .await?
         // Domain error (invalid token), so a new `UserConfirmError::UnknownToken` error is created instead of wrapping an `anyhow::Error`
         .ok_or(UserSubscribeError::UnknownToken)?;
@@ -82,9 +82,9 @@ pub async fn subscribe_user_and_delete_token(
         user_id,
         token,
     )
-    .execute(pool)
-    .await
-    .context("Failed to update the user status as subscribed")?;
+        .execute(pool)
+        .await
+        .context("Failed to update the user status as subscribed")?;
 
     Ok(())
 }
@@ -103,7 +103,7 @@ pub async fn send_subscribe_email(
     let user_email = get_user_email(*user_id, &pool).await?;
     let email = UserEmail::parse(user_email).map_err(UserSubscribeError::ValidationError)?;
 
-    let activation_token = generate_token();
+    let activation_token = utils::generate_token();
 
     store_subscription_token(&pool, *user_id, &activation_token).await?;
 
@@ -146,9 +146,9 @@ pub async fn get_user_email(user_id: Uuid, pool: &PgPool) -> Result<String, anyh
         "#,
         user_id,
     )
-    .fetch_one(pool)
-    .await
-    .context("Failed to perform a query to retrieve a user email.")?;
+        .fetch_one(pool)
+        .await
+        .context("Failed to perform a query to retrieve a user email.")?;
     Ok(row.email)
 }
 
@@ -165,9 +165,9 @@ pub async fn store_subscription_token(
         user_id,
         true,
     )
-    .execute(pool)
-    .await
-    .context("Failed to store the user subscription token")?;
+        .execute(pool)
+        .await
+        .context("Failed to store the user subscription token")?;
 
     Ok(())
 }

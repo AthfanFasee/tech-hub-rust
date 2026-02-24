@@ -2,17 +2,17 @@ use crate::authentication::{IsAdmin, UserId};
 use crate::domain::{
     Comment, CommentRecord, CommentResponseBody, CreateCommentPayload, CreateCommentResponseBody,
 };
-use crate::{build_error_response, error_chain_fmt};
+use crate::utils;
 use actix_web::http::StatusCode;
-use actix_web::{HttpResponse, ResponseError, web};
+use actix_web::{web, HttpResponse, ResponseError};
 use anyhow::Context;
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use sqlx::PgPool;
-use thiserror::Error;
+use thiserror;
 use uuid::Uuid;
 
-#[derive(Error)]
+#[derive(thiserror::Error)]
 pub enum CommentError {
     #[error("{0}")]
     ValidationError(String),
@@ -29,7 +29,7 @@ pub enum CommentError {
 
 impl std::fmt::Debug for CommentError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        error_chain_fmt(self, f)
+        utils::error_chain_fmt(self, f)
     }
 }
 
@@ -42,7 +42,7 @@ impl ResponseError for CommentError {
             CommentError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
-        build_error_response(status_code, self.to_string())
+        utils::build_error_response(status_code, self.to_string())
     }
 }
 
@@ -79,10 +79,10 @@ pub async fn get_comments_for_post(
         ORDER BY c.id DESC
         "#,
     )
-    .bind(post_id)
-    .fetch_all(pool)
-    .await
-    .context("Failed to load comments for posts")?;
+        .bind(post_id)
+        .fetch_all(pool)
+        .await
+        .context("Failed to load comments for posts")?;
 
     let comments = rows.into_iter().map(CommentResponseBody::from).collect();
 
@@ -134,9 +134,9 @@ pub async fn insert_comment(
         comment.post_id,
         user_id
     )
-    .fetch_one(pool)
-    .await
-    .context("Failed to insert comment")?;
+        .fetch_one(pool)
+        .await
+        .context("Failed to insert comment")?;
 
     Ok((record.id, record.created_at))
 }
@@ -174,9 +174,9 @@ pub async fn delete_comment_db(id: Uuid, pool: &PgPool) -> Result<(), CommentErr
         "#,
         id
     )
-    .execute(pool)
-    .await
-    .context("Failed to delete comment")?;
+        .execute(pool)
+        .await
+        .context("Failed to delete comment")?;
 
     if result.rows_affected() == 0 {
         return Err(CommentError::NotFound);
@@ -203,9 +203,9 @@ pub async fn did_user_create_the_comment(
         comment_id,
         user_id
     )
-    .fetch_one(pool)
-    .await
-    .context("Failed to check if user created this comment")?;
+        .fetch_one(pool)
+        .await
+        .context("Failed to check if user created this comment")?;
 
     Ok(result)
 }

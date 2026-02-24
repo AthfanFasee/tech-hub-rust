@@ -1,8 +1,8 @@
 use crate::authentication::UserId;
 use crate::domain::{NewsLetterData, Newsletter};
 use crate::idempotency::{IdempotencyKey, NextAction};
-use crate::idempotency::{save_response, try_processing};
-use crate::{build_error_response, error_chain_fmt};
+use crate::idempotency;
+use crate::utils;
 use actix_web::http::StatusCode;
 use actix_web::{HttpRequest, HttpResponse, ResponseError, web};
 use anyhow::Context;
@@ -27,7 +27,7 @@ pub enum PublishError {
 
 impl std::fmt::Debug for PublishError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        error_chain_fmt(self, f)
+        utils::error_chain_fmt(self, f)
     }
 }
 
@@ -40,7 +40,7 @@ impl ResponseError for PublishError {
             PublishError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
-        build_error_response(status_code, self.to_string())
+        utils::build_error_response(status_code, self.to_string())
     }
 }
 
@@ -72,7 +72,7 @@ pub async fn publish_newsletter(
         .try_into()
         .map_err(PublishError::BadRequest)?;
 
-    let mut transaction = match try_processing(&pool, &idempotency_key, *user_id).await? {
+    let mut transaction = match idempotency::try_processing(&pool, &idempotency_key, *user_id).await? {
         NextAction::StartProcessing(t) => t,
         NextAction::ReturnSavedResponse(saved_response) => {
             return Ok(saved_response);
@@ -90,7 +90,7 @@ pub async fn publish_newsletter(
     enqueue_delivery_tasks(&mut transaction, issue_id).await?;
 
     let response = HttpResponse::Ok().finish();
-    let response = save_response(transaction, &idempotency_key, *user_id, response).await?;
+    let response = idempotency::save_response(transaction, &idempotency_key, *user_id, response).await?;
     Ok(response)
 }
 

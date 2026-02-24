@@ -73,7 +73,7 @@ pub fn get_config() -> Result<Configuration, config::ConfigError> {
         .expect("Failed to parse APP_ENVIRONMENT");
 
     let environment_filename = format!("{}.yaml", environment.as_str());
-    // initialise config reader
+    // initialize config reader
     let configs = config::Config::builder()
         .add_source(config::File::from(config_directory.join("base.yaml")))
         .add_source(config::File::from(

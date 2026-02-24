@@ -1,6 +1,6 @@
 use super::IdempotencyKey;
 use actix_web::HttpResponse;
-use actix_web::body::to_bytes;
+use actix_web::body;
 use actix_web::http::StatusCode;
 use sqlx::{Executor, PgPool, Postgres, Transaction};
 use uuid::Uuid;
@@ -58,7 +58,7 @@ pub async fn save_response(
 ) -> Result<HttpResponse, anyhow::Error> {
     let (response_head, body) = http_response.into_parts();
 
-    let body = to_bytes(body).await.map_err(|e| anyhow::anyhow!("{}", e))?;
+    let body = body::to_bytes(body).await.map_err(|e| anyhow::anyhow!("{}", e))?;
     let status_code = response_head.status().as_u16() as i16;
     let headers = {
         let mut h = Vec::with_capacity(response_head.headers().len());

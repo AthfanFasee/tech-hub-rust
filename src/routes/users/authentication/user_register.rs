@@ -1,14 +1,13 @@
-use crate::authentication::compute_password_hash;
+use crate::authentication;
 use crate::domain::{NewUser, UserData, UserEmail, UserName, UserPassword};
 use crate::email_client::EmailClient;
 use crate::email_client::EmailError;
 use crate::startup::ApplicationBaseUrl;
-use crate::telemetry::spawn_blocking_with_tracing;
-use crate::utils::generate_token;
-use crate::{build_error_response, error_chain_fmt};
-use actix_web::ResponseError;
+use crate::telemetry;
+use crate::utils;
 use actix_web::http::StatusCode;
-use actix_web::{HttpResponse, web};
+use actix_web::ResponseError;
+use actix_web::{web, HttpResponse};
 use anyhow::Context;
 use secrecy::ExposeSecret;
 use sqlx::{Executor, PgPool, Postgres, Transaction};
@@ -26,7 +25,7 @@ pub enum UserRegisterError {
 
 impl std::fmt::Debug for UserRegisterError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        error_chain_fmt(self, f)
+        utils::error_chain_fmt(self, f)
     }
 }
 
@@ -37,7 +36,7 @@ impl ResponseError for UserRegisterError {
             UserRegisterError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
-        build_error_response(status_code, self.to_string())
+        utils::build_error_response(status_code, self.to_string())
     }
 }
 
@@ -74,7 +73,7 @@ pub async fn register_user(
 
     let user_id = insert_user(&name, &email, password, &mut transaction).await?;
 
-    let activation_token = generate_token();
+    let activation_token = utils::generate_token();
 
     store_activation_token(&mut transaction, user_id, &activation_token).await?;
 
@@ -101,7 +100,7 @@ pub async fn insert_user(
     transaction: &mut Transaction<'_, Postgres>,
 ) -> Result<Uuid, anyhow::Error> {
     let password_hash =
-        spawn_blocking_with_tracing(move || compute_password_hash(password.into_secret()))
+        telemetry::spawn_blocking_with_tracing(move || authentication::compute_password_hash(password.into_secret()))
             .await?
             .context("Failed to hash password")?;
 
@@ -157,7 +156,7 @@ pub async fn send_confirmation_email(
 ) -> Result<(), EmailError> {
     let confirmation_link = format!("{base_url}/v1/user/confirm/register?token={token}");
     let plain_body =
-        format!("Welcome to TechHub!\nVisit {confirmation_link} to confirm your registration.",);
+        format!("Welcome to TechHub!\nVisit {confirmation_link} to confirm your registration.", );
     let html_body = format!(
         "Welcome to TechHub!<br />\
         Click <a href=\"{confirmation_link}\">here</a> to confirm your subscription.",
@@ -183,7 +182,7 @@ pub enum UserActivationError {
 
 impl std::fmt::Debug for UserActivationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        error_chain_fmt(self, f)
+        utils::error_chain_fmt(self, f)
     }
 }
 
@@ -193,7 +192,8 @@ impl ResponseError for UserActivationError {
             UserActivationError::UnknownToken => StatusCode::UNAUTHORIZED,
             UserActivationError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
-        build_error_response(status_code, self.to_string())
+
+        utils::build_error_response(status_code, self.to_string())
     }
 }
 
@@ -234,9 +234,9 @@ pub async fn activate_user_and_delete_token(
         user_id,
         token,
     )
-    .execute(pool)
-    .await
-    .context("Failed to update the user status as activated")?;
+        .execute(pool)
+        .await
+        .context("Failed to update the user status as activated")?;
 
     Ok(())
 }
@@ -250,8 +250,8 @@ pub async fn get_user_id_from_token(
             WHERE token = $1",
         token,
     )
-    .fetch_optional(pool)
-    .await
-    .context("Failed to retrieve the user id associated with the provided token.")?;
+        .fetch_optional(pool)
+        .await
+        .context("Failed to retrieve the user id associated with the provided token.")?;
     Ok(result.map(|r| r.user_id))
 }

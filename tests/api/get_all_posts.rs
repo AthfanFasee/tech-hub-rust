@@ -1,5 +1,5 @@
-use crate::helpers::spawn_app;
 use uuid::Uuid;
+use crate::helpers;
 
 // ============================================================================
 // Basic Functionality
@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 #[tokio::test]
 async fn get_all_posts_returns_posts_successfully() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     app.create_sample_post().await;
@@ -28,7 +28,7 @@ async fn get_all_posts_returns_posts_successfully() {
 
 #[tokio::test]
 async fn get_all_posts_works_without_authentication() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     app.create_sample_post_custom("Public Post", "Public content")
@@ -49,7 +49,7 @@ async fn get_all_posts_works_without_authentication() {
 
 #[tokio::test]
 async fn get_all_posts_returns_empty_array_when_no_posts() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     let response = app.get_all_posts("").await;
     assert_eq!(
@@ -69,7 +69,7 @@ async fn get_all_posts_returns_empty_array_when_no_posts() {
 
 #[tokio::test]
 async fn get_all_posts_respects_pagination_limit() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     for i in 1..=5 {
@@ -92,7 +92,7 @@ async fn get_all_posts_respects_pagination_limit() {
 
 #[tokio::test]
 async fn get_all_posts_respects_page_parameter() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     for i in 1..=5 {
@@ -110,7 +110,7 @@ async fn get_all_posts_respects_page_parameter() {
 
 #[tokio::test]
 async fn get_all_posts_returns_correct_metadata() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     for i in 1..=10 {
@@ -135,7 +135,7 @@ async fn get_all_posts_returns_correct_metadata() {
 
 #[tokio::test]
 async fn get_all_posts_rejects_invalid_page_zero() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     let response = app.get_all_posts("?page=0").await;
     assert_eq!(response.status().as_u16(), 400, "Expected 400 for page=0");
@@ -143,7 +143,7 @@ async fn get_all_posts_rejects_invalid_page_zero() {
 
 #[tokio::test]
 async fn get_all_posts_rejects_invalid_page_negative() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     let response = app.get_all_posts("?page=-1").await;
     assert_eq!(
@@ -155,7 +155,7 @@ async fn get_all_posts_rejects_invalid_page_negative() {
 
 #[tokio::test]
 async fn get_all_posts_rejects_page_exceeding_maximum() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     let response = app.get_all_posts("?page=1000001").await;
     assert_eq!(
@@ -167,7 +167,7 @@ async fn get_all_posts_rejects_page_exceeding_maximum() {
 
 #[tokio::test]
 async fn get_all_posts_rejects_invalid_limit_zero() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     let response = app.get_all_posts("?limit=0").await;
     assert_eq!(response.status().as_u16(), 400, "Expected 400 for limit=0");
@@ -175,7 +175,7 @@ async fn get_all_posts_rejects_invalid_limit_zero() {
 
 #[tokio::test]
 async fn get_all_posts_rejects_limit_exceeding_maximum() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     let response = app.get_all_posts("?limit=101").await;
     assert_eq!(
@@ -187,7 +187,7 @@ async fn get_all_posts_rejects_limit_exceeding_maximum() {
 
 #[tokio::test]
 async fn get_all_posts_rejects_invalid_sort_parameter() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     let response = app.get_all_posts("?sort=invalid").await;
     assert_eq!(
@@ -199,7 +199,7 @@ async fn get_all_posts_rejects_invalid_sort_parameter() {
 
 #[tokio::test]
 async fn get_all_posts_rejects_title_exceeding_maximum_length() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     let long_title = "a".repeat(101);
     let response = app.get_all_posts(&format!("?title={long_title}")).await;
@@ -216,7 +216,7 @@ async fn get_all_posts_rejects_title_exceeding_maximum_length() {
 
 #[tokio::test]
 async fn get_all_posts_sorts_by_id_descending_by_default() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let id1 = app.create_sample_post_custom("First", "Content").await;
@@ -237,7 +237,7 @@ async fn get_all_posts_sorts_by_id_descending_by_default() {
 
 #[tokio::test]
 async fn get_all_posts_sorts_by_created_at_descending_by_default() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let id1 = app.create_sample_post_custom("First", "Content").await;
@@ -260,7 +260,7 @@ async fn get_all_posts_sorts_by_created_at_descending_by_default() {
 
 #[tokio::test]
 async fn get_all_posts_sorts_by_title_ascending() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     app.create_sample_post_custom("Zebra", "Content").await;
@@ -280,7 +280,7 @@ async fn get_all_posts_sorts_by_title_ascending() {
 
 #[tokio::test]
 async fn get_all_posts_sorts_by_title_descending() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     app.create_sample_post_custom("Zebra", "Content").await;
@@ -300,7 +300,7 @@ async fn get_all_posts_sorts_by_title_descending() {
 
 #[tokio::test]
 async fn get_all_posts_sorts_by_likes_count_descending() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     app.create_sample_post().await;
@@ -339,7 +339,7 @@ async fn get_all_posts_sorts_by_likes_count_descending() {
 
 #[tokio::test]
 async fn get_all_posts_filters_by_title() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     app.create_sample_post_custom("Rust Programming", "Content")
@@ -361,7 +361,7 @@ async fn get_all_posts_filters_by_title() {
 
 #[tokio::test]
 async fn get_all_posts_title_search_is_case_insensitive() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     app.create_sample_post_custom("JavaScript Tutorial", "Content")
@@ -381,7 +381,7 @@ async fn get_all_posts_title_search_is_case_insensitive() {
 
 #[tokio::test]
 async fn get_all_posts_returns_all_posts_when_title_is_empty() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     app.create_sample_post().await;
@@ -400,7 +400,7 @@ async fn get_all_posts_returns_all_posts_when_title_is_empty() {
 
 #[tokio::test]
 async fn get_all_posts_filters_by_creator_id() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let creator_id = app.test_user.user_id;
@@ -424,7 +424,7 @@ async fn get_all_posts_filters_by_creator_id() {
 
 #[tokio::test]
 async fn get_all_posts_returns_empty_for_nonexistent_creator() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     app.create_sample_post().await;
@@ -439,7 +439,7 @@ async fn get_all_posts_returns_empty_for_nonexistent_creator() {
 
 #[tokio::test]
 async fn get_all_posts_returns_all_posts_when_id_is_empty() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     app.create_sample_post().await;
@@ -458,7 +458,7 @@ async fn get_all_posts_returns_all_posts_when_id_is_empty() {
 
 #[tokio::test]
 async fn get_all_posts_excludes_soft_deleted_posts() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let post1 = app
@@ -487,7 +487,7 @@ async fn get_all_posts_excludes_soft_deleted_posts() {
 
 #[tokio::test]
 async fn get_all_posts_returns_correct_post_structure() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     app.create_sample_post_custom("Test Post", "Test Content")
@@ -517,7 +517,7 @@ async fn get_all_posts_returns_correct_post_structure() {
 
 #[tokio::test]
 async fn get_all_posts_combines_title_and_creator_filters() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let creator_id = app.test_user.user_id;
@@ -543,7 +543,7 @@ async fn get_all_posts_combines_title_and_creator_filters() {
 
 #[tokio::test]
 async fn get_all_posts_combines_filters_with_pagination_and_sorting() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     app.create_sample_post_custom("Apple Tutorial", "Content")

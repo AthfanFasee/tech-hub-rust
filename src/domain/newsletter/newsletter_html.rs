@@ -1,4 +1,4 @@
-use html5ever::driver::parse_document;
+use html5ever::driver;
 use html5ever::tendril::TendrilSink;
 use markup5ever_rcdom::{Handle, NodeData, RcDom};
 
@@ -35,7 +35,7 @@ impl NewsletterHtml {
         }
 
         // Parse the HTML document to ensure it's valid
-        let dom = parse_document(RcDom::default(), Default::default()).one(s);
+        let dom = driver::parse_document(RcDom::default(), Default::default()).one(s);
 
         // Verify the parsed document has actual element nodes
         Self::has_element_nodes(&dom.document)

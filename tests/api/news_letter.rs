@@ -1,17 +1,17 @@
-use crate::helpers::spawn_app;
+use crate::helpers;
 use std::time::Duration;
-use techhub::newsletter_delivery_worker::cleanup_old_newsletter_issues;
+use techhub::newsletter_delivery_worker;
 use uuid::Uuid;
-use wiremock::matchers::{any, method, path};
+use wiremock::matchers;
 use wiremock::{Mock, ResponseTemplate};
 
 #[tokio::test]
 async fn newsletters_are_not_delivered_to_inactivated_user() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.create_inactivated_user().await;
     app.login_admin().await;
 
-    Mock::given(any())
+    Mock::given(matchers::any())
         .respond_with(ResponseTemplate::new(200))
         .expect(0)
         .mount(&app.email_server)
@@ -34,12 +34,12 @@ async fn newsletters_are_not_delivered_to_inactivated_user() {
 
 #[tokio::test]
 async fn newsletters_are_not_delivered_to_confirmed_but_unsubscribed_users() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.create_activated_user().await;
     app.login_admin().await;
 
-    Mock::given(path("/email"))
-        .and(method("POST"))
+    Mock::given(matchers::path("/email"))
+        .and(matchers::method("POST"))
         .respond_with(ResponseTemplate::new(200))
         .expect(0)
         .mount(&app.email_server)
@@ -62,7 +62,7 @@ async fn newsletters_are_not_delivered_to_confirmed_but_unsubscribed_users() {
 
 #[tokio::test]
 async fn newsletters_returns_400_for_invalid_data() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login_admin().await;
 
     let invalid_cases = vec![
@@ -244,7 +244,7 @@ async fn newsletters_returns_400_for_invalid_data() {
 
 #[tokio::test]
 async fn newsletters_returns_200_for_valid_data() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login_admin().await;
 
     let valid_cases = vec![
@@ -325,7 +325,7 @@ async fn newsletters_returns_200_for_valid_data() {
 
 #[tokio::test]
 async fn non_admins_are_rejected_to_publish_newsletters() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let newsletter_body = serde_json::json!({
@@ -343,7 +343,7 @@ async fn non_admins_are_rejected_to_publish_newsletters() {
 
 #[tokio::test]
 async fn anonymous_users_cannot_publish_newsletters() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     let newsletter_body = serde_json::json!({
         "title": "Unauthorized attempt",
@@ -360,12 +360,12 @@ async fn anonymous_users_cannot_publish_newsletters() {
 
 #[tokio::test]
 async fn newsletters_are_delivered_to_a_user_who_subscribed_via_the_full_flow() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.create_active_subscriber().await;
     app.login_admin().await;
 
-    Mock::given(path("/email"))
-        .and(method("POST"))
+    Mock::given(matchers::path("/email"))
+        .and(matchers::method("POST"))
         .respond_with(ResponseTemplate::new(200))
         .expect(1)
         .mount(&app.email_server)
@@ -388,12 +388,12 @@ async fn newsletters_are_delivered_to_a_user_who_subscribed_via_the_full_flow() 
 
 #[tokio::test]
 async fn newsletter_publishing_is_idempotent() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.create_active_subscriber().await;
     app.login_admin().await;
 
-    Mock::given(path("/email"))
-        .and(method("POST"))
+    Mock::given(matchers::path("/email"))
+        .and(matchers::method("POST"))
         .respond_with(ResponseTemplate::new(200))
         .expect(1)
         .mount(&app.email_server)
@@ -419,12 +419,12 @@ async fn newsletter_publishing_is_idempotent() {
 
 #[tokio::test]
 async fn concurrent_newsletter_publishing_is_handled_gracefully() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.create_active_subscriber().await;
     app.login_admin().await;
 
-    Mock::given(path("/email"))
-        .and(method("POST"))
+    Mock::given(matchers::path("/email"))
+        .and(matchers::method("POST"))
         // Setting a delay ensures that the second request arrives before the first one completes
         .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_secs(1)))
         .expect(1)
@@ -457,12 +457,12 @@ async fn concurrent_newsletter_publishing_is_handled_gracefully() {
 
 #[tokio::test]
 async fn failed_newsletter_delivery_is_retried_with_back_off() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.create_active_subscriber().await;
     app.login_admin().await;
 
-    Mock::given(path("/email"))
-        .and(method("POST"))
+    Mock::given(matchers::path("/email"))
+        .and(matchers::method("POST"))
         .respond_with(ResponseTemplate::new(500))
         .mount(&app.email_server)
         .await;
@@ -486,9 +486,9 @@ async fn failed_newsletter_delivery_is_retried_with_back_off() {
         FROM issue_delivery_queue
         "#,
     )
-    .fetch_all(&app.db_pool)
-    .await
-    .expect("Expected to query issue_delivery_queue");
+        .fetch_all(&app.db_pool)
+        .await
+        .expect("Expected to query issue_delivery_queue");
 
     assert_eq!(tasks.len(), 1, "Expected exactly one delivery task");
     let task = &tasks[0];
@@ -505,9 +505,9 @@ async fn failed_newsletter_delivery_is_retried_with_back_off() {
         task.newsletter_issue_id,
         task.user_email
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Expected task to still exist after retry");
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Expected task to still exist after retry");
 
     assert_eq!(record.n_retries, 1, "Retry count should increment");
     assert!(
@@ -518,7 +518,7 @@ async fn failed_newsletter_delivery_is_retried_with_back_off() {
 
 #[tokio::test]
 async fn old_newsletter_issues_are_cleaned_up() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     let pool = &app.db_pool;
 
     // Insert an old newsletter issue (older than 7 days)
@@ -532,9 +532,9 @@ async fn old_newsletter_issues_are_cleaned_up() {
         "Old text content",
         "<p>Old HTML content</p>",
     )
-    .execute(pool)
-    .await
-    .unwrap();
+        .execute(pool)
+        .await
+        .unwrap();
 
     // Insert a recent newsletter issue (newer than 7 days)
     let new_id = Uuid::new_v4();
@@ -548,21 +548,21 @@ async fn old_newsletter_issues_are_cleaned_up() {
         "Recent text content",
         "<p>Recent HTML content</p>",
     )
-    .execute(pool)
-    .await
-    .unwrap();
+        .execute(pool)
+        .await
+        .unwrap();
 
-    cleanup_old_newsletter_issues(pool).await.unwrap();
+    newsletter_delivery_worker::cleanup_old_newsletter_issues(pool).await.unwrap();
 
     // Old newsletter should be deleted
     let old_exists = sqlx::query_scalar!(
         r#"SELECT EXISTS(SELECT 1 FROM newsletter_issues WHERE title = $1)"#,
         "Old newsletter"
     )
-    .fetch_one(pool)
-    .await
-    .unwrap()
-    .unwrap();
+        .fetch_one(pool)
+        .await
+        .unwrap()
+        .unwrap();
     assert!(!old_exists, "Old newsletter issue was not deleted");
 
     // Recent newsletter should still exist
@@ -570,9 +570,9 @@ async fn old_newsletter_issues_are_cleaned_up() {
         r#"SELECT EXISTS(SELECT 1 FROM newsletter_issues WHERE id = $1)"#,
         new_id
     )
-    .fetch_one(pool)
-    .await
-    .unwrap()
-    .unwrap();
+        .fetch_one(pool)
+        .await
+        .unwrap()
+        .unwrap();
     assert!(new_exists, "Recent newsletter issue was wrongly deleted");
 }

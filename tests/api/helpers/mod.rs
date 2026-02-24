@@ -9,9 +9,11 @@ use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version};
 use secrecy::Secret;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::sync::OnceLock;
-use techhub::configuration::{DatabaseConfigs, get_config};
+use techhub::configuration::{DatabaseConfigs};
+use techhub::configuration;
 use techhub::email_client::EmailClient;
-use techhub::startup::{Application, get_connection_pool};
+use techhub::startup::{Application};
+use techhub::startup;
 use techhub::telemetry;
 use uuid::Uuid;
 use wiremock::MockServer;
@@ -108,7 +110,7 @@ pub async fn spawn_app() -> TestApp {
     let email_server = MockServer::start().await;
 
     let configuration = {
-        let mut c = get_config().expect("Failed to read configuration.");
+        let mut c = configuration::get_config().expect("Failed to read configuration.");
         c.database.database_name = Uuid::new_v4().to_string();
         c.application.port = 0;
         c.email_client.base_url = email_server.uri();
@@ -131,7 +133,7 @@ pub async fn spawn_app() -> TestApp {
     let test_app = TestApp {
         address: format!("http://localhost:{}", application_port),
         port: application_port,
-        db_pool: get_connection_pool(&configuration.database),
+        db_pool: startup::get_connection_pool(&configuration.database),
         email_server,
         test_user: TestUser::generate(),
         api_client: client,

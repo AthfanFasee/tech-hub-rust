@@ -1,10 +1,11 @@
-use crate::helpers::{TestUser, spawn_app};
-use wiremock::matchers::{method, path};
+use crate::helpers;
+use crate::helpers::TestUser;
+use wiremock::matchers;
 use wiremock::{Mock, ResponseTemplate};
 
 #[tokio::test]
 async fn register_user_persists_the_new_user_and_returns_a_200_for_valid_json_data() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     let user = TestUser::generate();
     let payload = serde_json::json!({
@@ -13,8 +14,8 @@ async fn register_user_persists_the_new_user_and_returns_a_200_for_valid_json_da
         "password": user.password,
     });
 
-    Mock::given(path("/email"))
-        .and(method("POST"))
+    Mock::given(matchers::path("/email"))
+        .and(matchers::method("POST"))
         .respond_with(ResponseTemplate::new(200))
         .mount(&app.email_server)
         .await;
@@ -30,9 +31,9 @@ async fn register_user_persists_the_new_user_and_returns_a_200_for_valid_json_da
         "#,
         user.email,
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Failed to fetch saved user data.");
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to fetch saved user data.");
 
     assert_eq!(saved.email, user.email);
     assert_eq!(saved.user_name, user.user_name);
@@ -42,7 +43,7 @@ async fn register_user_persists_the_new_user_and_returns_a_200_for_valid_json_da
 
 #[tokio::test]
 async fn register_user_can_login_using_their_credentials() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     let user = TestUser::generate();
     let payload = serde_json::json!({
         "user_name": user.user_name,
@@ -50,8 +51,8 @@ async fn register_user_can_login_using_their_credentials() {
         "password": user.password,
     });
 
-    Mock::given(path("/email"))
-        .and(method("POST"))
+    Mock::given(matchers::path("/email"))
+        .and(matchers::method("POST"))
         .respond_with(ResponseTemplate::new(200))
         .expect(1)
         .mount(&app.email_server)
@@ -84,7 +85,7 @@ async fn register_user_can_login_using_their_credentials() {
 
 #[tokio::test]
 async fn register_user_returns_a_400_when_data_is_missing() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     let user = TestUser::generate();
     let test_cases = vec![
@@ -115,7 +116,7 @@ async fn register_user_returns_a_400_when_data_is_missing() {
 
 #[tokio::test]
 async fn register_user_returns_a_400_when_data_is_present_but_invalid() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     let user = TestUser::generate();
     let test_cases = vec![
@@ -153,7 +154,7 @@ async fn register_user_returns_a_400_when_data_is_present_but_invalid() {
 
 #[tokio::test]
 async fn register_user_sends_a_confirmation_email_with_a_link() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     let user = TestUser::generate();
     let payload = serde_json::json!({
         "user_name": user.user_name,
@@ -161,8 +162,8 @@ async fn register_user_sends_a_confirmation_email_with_a_link() {
         "password": user.password,
     });
 
-    Mock::given(path("/email"))
-        .and(method("POST"))
+    Mock::given(matchers::path("/email"))
+        .and(matchers::method("POST"))
         .respond_with(ResponseTemplate::new(200))
         .expect(1)
         .mount(&app.email_server)
@@ -180,7 +181,7 @@ async fn register_user_sends_a_confirmation_email_with_a_link() {
 
 #[tokio::test]
 async fn register_user_returns_500_if_email_sending_fails() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     let user = TestUser::generate();
     let payload = serde_json::json!({
         "user_name": user.user_name,
@@ -188,8 +189,8 @@ async fn register_user_returns_500_if_email_sending_fails() {
         "password": user.password
     });
 
-    Mock::given(path("/email"))
-        .and(method("POST"))
+    Mock::given(matchers::path("/email"))
+        .and(matchers::method("POST"))
         .respond_with(ResponseTemplate::new(500))
         .mount(&app.email_server)
         .await;
@@ -200,7 +201,7 @@ async fn register_user_returns_500_if_email_sending_fails() {
 
 #[tokio::test]
 async fn register_user_fails_if_there_is_a_fatal_database_error() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     let user = TestUser::generate();
     let payload = serde_json::json!({
         "user_name": user.user_name,
@@ -220,7 +221,7 @@ async fn register_user_fails_if_there_is_a_fatal_database_error() {
 
 #[tokio::test]
 async fn clicking_on_the_confirmation_link_activates_a_user_in_db() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     let user = TestUser::generate();
     let payload = serde_json::json!({
@@ -229,8 +230,8 @@ async fn clicking_on_the_confirmation_link_activates_a_user_in_db() {
         "password": user.password
     });
 
-    Mock::given(path("/email"))
-        .and(method("POST"))
+    Mock::given(matchers::path("/email"))
+        .and(matchers::method("POST"))
         .respond_with(ResponseTemplate::new(200))
         .mount(&app.email_server)
         .await;
@@ -255,9 +256,9 @@ async fn clicking_on_the_confirmation_link_activates_a_user_in_db() {
         "#,
         user.email,
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Failed to fetch saved user data.");
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to fetch saved user data.");
 
     assert_eq!(saved.email, user.email);
     assert_eq!(saved.user_name, user.user_name);
@@ -266,7 +267,7 @@ async fn clicking_on_the_confirmation_link_activates_a_user_in_db() {
 
 #[tokio::test]
 async fn confirm_activation_requests_without_token_are_rejected_with_a_400() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     let response = reqwest::get(&format!("{}/v1/user/confirm/register", app.address))
         .await
@@ -276,20 +277,20 @@ async fn confirm_activation_requests_without_token_are_rejected_with_a_400() {
 
 #[tokio::test]
 async fn confirm_user_with_invalid_token_returns_401() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     let response = reqwest::get(&format!(
         "{}/v1/user/confirm/register?token=not-a-real-token",
         app.address
     ))
-    .await
-    .unwrap();
+        .await
+        .unwrap();
     assert_eq!(response.status().as_u16(), 401);
 }
 
 #[tokio::test]
 async fn activation_token_is_deleted_after_successful_confirmation() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     let user = TestUser::generate();
     let payload = serde_json::json!({
         "user_name": user.user_name,
@@ -297,8 +298,8 @@ async fn activation_token_is_deleted_after_successful_confirmation() {
         "password": user.password
     });
 
-    Mock::given(path("/email"))
-        .and(method("POST"))
+    Mock::given(matchers::path("/email"))
+        .and(matchers::method("POST"))
         .respond_with(ResponseTemplate::new(200))
         .mount(&app.email_server)
         .await;
@@ -319,9 +320,9 @@ async fn activation_token_is_deleted_after_successful_confirmation() {
         r#"SELECT COUNT(*) as count FROM tokens WHERE user_id = $1 AND is_activation = true"#,
         app.test_user.user_id,
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .unwrap();
+        .fetch_one(&app.db_pool)
+        .await
+        .unwrap();
 
     assert_eq!(remaining_tokens.count, Some(0));
 }

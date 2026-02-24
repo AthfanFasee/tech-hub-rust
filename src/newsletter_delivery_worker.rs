@@ -1,13 +1,14 @@
 use crate::domain::UserEmail;
 use crate::email_client::EmailClient;
-use crate::{configuration::Configuration, startup::get_connection_pool};
+use crate::configuration::Configuration;
+use crate::startup;
 use anyhow::Context;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use sqlx::{Executor, PgPool, Postgres, Transaction};
 use std::ops::DerefMut;
 use tokio::time::Duration;
-use tracing::{Span, field::display};
+use tracing::{field, Span};
 use uuid::Uuid;
 
 pub enum ExecutionOutcome {
@@ -16,7 +17,7 @@ pub enum ExecutionOutcome {
 }
 
 pub async fn run_worker_until_stopped(config: Configuration) -> Result<(), anyhow::Error> {
-    let connection_pool = get_connection_pool(&config.database);
+    let connection_pool = startup::get_connection_pool(&config.database);
     let email_client = config.email_client.client();
     worker_loop(connection_pool, email_client).await
 }
@@ -100,8 +101,8 @@ pub async fn try_execute_task(
     let (mut transaction, issue_id, email, n_retries) = maybe_task.unwrap();
 
     Span::current()
-        .record("newsletter_issue_id", display(issue_id))
-        .record("subscriber_email", display(&email));
+        .record("newsletter_issue_id", field::display(issue_id))
+        .record("subscriber_email", field::display(&email));
 
     // Process the task within the same transaction
     let result =
@@ -209,9 +210,9 @@ async fn dequeue_task(
         LIMIT 1
         "#
     )
-    .fetch_optional(transaction.deref_mut())
-    .await
-    .context("Failed dequeue a newsletter issue task from db")?;
+        .fetch_optional(transaction.deref_mut())
+        .await
+        .context("Failed dequeue a newsletter issue task from db")?;
 
     if let Some(r) = r {
         Ok(Some((
@@ -314,9 +315,9 @@ async fn get_newsletter_issue(
         "#,
         issue_id
     )
-    .fetch_one(&mut **transaction)
-    .await
-    .context("Failed to get newsletter issue details")?;
+        .fetch_one(&mut **transaction)
+        .await
+        .context("Failed to get newsletter issue details")?;
 
     Ok(issue)
 }
@@ -341,9 +342,9 @@ pub async fn cleanup_old_newsletter_issues(pool: &PgPool) -> Result<(), anyhow::
         WHERE created_at < NOW() - INTERVAL '7 days'
         "#,
     )
-    .execute(pool)
-    .await?
-    .rows_affected();
+        .execute(pool)
+        .await?
+        .rows_affected();
 
     tracing::info!(deleted, "Old newsletter issues cleanup completed");
     Ok(())

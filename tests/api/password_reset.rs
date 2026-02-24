@@ -1,9 +1,9 @@
-use crate::helpers::spawn_app;
 use uuid::Uuid;
+use crate::helpers;
 
 #[tokio::test]
 async fn user_must_be_logged_in_to_change_their_password() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     let new_password = Uuid::new_v4().to_string();
 
     let response = app
@@ -22,7 +22,7 @@ async fn user_must_be_logged_in_to_change_their_password() {
 
 #[tokio::test]
 async fn current_password_must_be_valid() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     let new_password = Uuid::new_v4().to_string();
     let wrong_password = Uuid::new_v4().to_string();
 
@@ -44,7 +44,7 @@ async fn current_password_must_be_valid() {
 
 #[tokio::test]
 async fn changing_password_works() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     let new_password = Uuid::new_v4().to_string();
 
     app.login().await;

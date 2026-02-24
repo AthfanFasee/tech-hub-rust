@@ -1,7 +1,8 @@
 use crate::authentication::UserId;
-use crate::authentication::{AuthError, Credentials, validate_credentials};
+use crate::authentication;
+use crate::authentication::{AuthError, Credentials};
 use crate::domain::UserPassword;
-use crate::{build_error_response, error_chain_fmt};
+use crate::utils;
 use actix_web::http::StatusCode;
 use actix_web::{HttpResponse, ResponseError, web};
 use anyhow::Context;
@@ -22,7 +23,7 @@ pub enum PasswordResetError {
 
 impl std::fmt::Debug for PasswordResetError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        error_chain_fmt(self, f)
+        utils::error_chain_fmt(self, f)
     }
 }
 
@@ -34,7 +35,7 @@ impl ResponseError for PasswordResetError {
             PasswordResetError::BadRequest(_) => StatusCode::BAD_REQUEST,
         };
 
-        build_error_response(status_code, self.to_string())
+        utils::build_error_response(status_code, self.to_string())
     }
 }
 
@@ -77,7 +78,7 @@ pub async fn change_password(
         password: current_password.into_secret(),
     };
 
-    if let Err(e) = validate_credentials(credentials, &pool).await {
+    if let Err(e) = authentication::validate_credentials(credentials, &pool).await {
         return match e {
             AuthError::InvalidCredentials(_) => Err(PasswordResetError::AuthError(e.into())),
             AuthError::UnexpectedError(_) => Err(PasswordResetError::UnexpectedError(e.into())),

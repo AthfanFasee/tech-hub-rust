@@ -1,14 +1,15 @@
 use crate::configuration::{Configuration, DatabaseConfigs};
 use crate::email_client::EmailClient;
-use crate::routes::{admin_routes, comment_routes, health_check, post_routes, user_routes};
-use actix_session::SessionMiddleware;
+use crate::routes;
 use actix_session::storage::RedisSessionStore;
+use actix_session::SessionMiddleware;
 use actix_web::dev::Server;
-use actix_web::{App, HttpServer, web};
+use actix_web::{web, web::Data, web::ServiceConfig, App, HttpServer};
+use actix_web::cookie::Key;
 use anyhow::Context;
 use secrecy::{ExposeSecret, Secret};
-use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
+use sqlx::PgPool;
 use std::net::TcpListener;
 use tracing_actix_web::TracingLogger;
 
@@ -38,8 +39,8 @@ impl Application {
             config.application.hmac_secret,
             config.application.redis_uri,
         )
-        .await
-        .context("Failed to run Actix web server")?;
+            .await
+            .context("Failed to run Actix web server")?;
 
         Ok(Self { port, server })
     }
@@ -68,11 +69,11 @@ async fn run(
     hmac_secret: Secret<String>,
     redis_uri: Secret<String>,
 ) -> Result<Server, anyhow::Error> {
-    let db_pool = web::Data::new(db_pool);
-    let email_client = web::Data::new(email_client);
-    let base_url = web::Data::new(ApplicationBaseUrl(base_url));
+    let db_pool = Data::new(db_pool);
+    let email_client = Data::new(email_client);
+    let base_url = Data::new(ApplicationBaseUrl(base_url));
 
-    let secret_key = actix_web::cookie::Key::from(hmac_secret.expose_secret().as_bytes());
+    let secret_key = Key::from(hmac_secret.expose_secret().as_bytes());
 
     let redis_store = RedisSessionStore::new(redis_uri.expose_secret())
         .await
@@ -91,9 +92,9 @@ async fn run(
             .app_data(email_client.clone())
             .app_data(base_url.clone())
     })
-    .listen(tcp_listener)
-    .with_context(|| "Failed to bind Actix server to TCP listener")?
-    .run();
+        .listen(tcp_listener)
+        .with_context(|| "Failed to bind Actix server to TCP listener")?
+        .run();
 
     Ok(server)
 }
@@ -101,13 +102,13 @@ async fn run(
 #[derive(Clone)]
 pub struct HmacSecret(pub Secret<String>);
 
-pub fn configure_routes(cfg: &mut web::ServiceConfig) {
-    cfg.route("/health_check", web::get().to(health_check))
+pub fn configure_routes(cfg: &mut ServiceConfig) {
+    cfg.route("/health_check", web::get().to(routes::health_check))
         .service(
             web::scope("/v1")
-                .service(web::scope("/user").configure(user_routes))
-                .service(web::scope("/admin").configure(admin_routes))
-                .service(web::scope("/posts").configure(post_routes))
-                .service(web::scope("/comment").configure(comment_routes)),
+                .service(web::scope("/user").configure(routes::user_routes))
+                .service(web::scope("/admin").configure(routes::admin_routes))
+                .service(web::scope("/posts").configure(routes::post_routes))
+                .service(web::scope("/comment").configure(routes::comment_routes)),
         );
 }

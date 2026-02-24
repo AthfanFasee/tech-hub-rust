@@ -1,9 +1,9 @@
 use crate::helpers::{ConfirmationLinks, TestApp, TestUser};
 use linkify::{LinkFinder, LinkKind};
 use reqwest::{Response, header::HeaderMap};
-use serde_json::{Value, json};
+use serde_json::{Value};
 use uuid::Uuid;
-use wiremock::matchers::{method, path};
+use wiremock::matchers;
 use wiremock::{Mock, Request, ResponseTemplate};
 
 impl TestApp {
@@ -29,14 +29,14 @@ impl TestApp {
 
     pub async fn create_inactivated_user(&self) -> (Value, ConfirmationLinks) {
         let user = TestUser::generate();
-        let payload = json!({
+        let payload = serde_json::json!({
             "user_name": user.user_name,
             "email": user.email,
             "password": user.password,
         });
 
-        let _mock_guard = Mock::given(path("/email"))
-            .and(method("POST"))
+        let _mock_guard = Mock::given(matchers::path("/email"))
+            .and(matchers::method("POST"))
             .respond_with(ResponseTemplate::new(200))
             .named("Create inactivated user")
             .expect(1)
@@ -76,8 +76,8 @@ impl TestApp {
         let response = self.login_with(&payload).await;
         assert_eq!(response.status().as_u16(), 200);
 
-        let _mock_guard = Mock::given(path("/email"))
-            .and(method("POST"))
+        let _mock_guard = Mock::given(matchers::path("/email"))
+            .and(matchers::method("POST"))
             .respond_with(ResponseTemplate::new(200))
             .named("Subscription confirmation email")
             .expect(1)
@@ -100,7 +100,7 @@ impl TestApp {
     }
 
     pub async fn create_sample_post(&self) -> Uuid {
-        let payload = json!({
+        let payload = serde_json::json!({
             "title": "Post for comments",
             "text": "This is a sample posts to attach comments to",
             "img": "https://example.com/posts.jpg"
@@ -113,7 +113,7 @@ impl TestApp {
     }
 
     pub async fn create_sample_post_custom(&self, title: &str, text: &str) -> Uuid {
-        let payload = json!({
+        let payload = serde_json::json!({
             "title": title,
             "text": text,
             "img": "https://example.com/sample.jpg"

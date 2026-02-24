@@ -1,7 +1,5 @@
-use actix_web::http::StatusCode;
-use actix_web::{HttpResponse, error};
-use rand::distributions::Alphanumeric;
-use rand::{Rng, thread_rng};
+use actix_web::{error, HttpResponse, http::StatusCode};
+use rand::{distributions::Alphanumeric, Rng};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -38,7 +36,7 @@ pub fn error_chain_fmt(
 }
 
 pub fn generate_token() -> String {
-    let mut rng = thread_rng();
+    let mut rng = rand::thread_rng();
     std::iter::repeat_with(|| rng.sample(Alphanumeric))
         .map(char::from)
         .take(25)

@@ -1,9 +1,9 @@
-use crate::helpers::spawn_app;
+use crate::helpers;
 use uuid::Uuid;
 
 #[tokio::test]
 async fn login_returns_success_for_valid_username_and_password() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     let payload = serde_json::json!({
     "user_name": &app.test_user.user_name,
@@ -21,7 +21,7 @@ async fn login_returns_success_for_valid_username_and_password() {
 
 #[tokio::test]
 async fn login_returns_unauthorized_for_invalid_username_or_password() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     let payload = serde_json::json!({
     "user_name": &app.test_user.user_name,
@@ -39,7 +39,7 @@ async fn login_returns_unauthorized_for_invalid_username_or_password() {
 
 #[tokio::test]
 async fn login_does_not_leak_internal_error_details_on_auth_failure() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     // Use a valid username but wrong password
     let payload = serde_json::json!({
@@ -68,7 +68,7 @@ async fn login_does_not_leak_internal_error_details_on_auth_failure() {
 
 #[tokio::test]
 async fn logout_clears_session_state() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
     app.login().await;
 
     let response = app.access_protected().await;
@@ -88,7 +88,7 @@ async fn logout_clears_session_state() {
 
 #[tokio::test]
 async fn login_rejects_empty_username() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     let payload = serde_json::json!({
         "user_name": "",
@@ -106,7 +106,7 @@ async fn login_rejects_empty_username() {
 
 #[tokio::test]
 async fn login_rejects_empty_password() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     let payload = serde_json::json!({
         "user_name": &app.test_user.user_name,
@@ -124,7 +124,7 @@ async fn login_rejects_empty_password() {
 
 #[tokio::test]
 async fn login_rejects_username_that_is_too_long() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     let too_long_username = "a".repeat(257);
 
@@ -144,7 +144,7 @@ async fn login_rejects_username_that_is_too_long() {
 
 #[tokio::test]
 async fn login_rejects_password_that_is_too_short() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     let payload = serde_json::json!({
         "user_name": &app.test_user.user_name,
@@ -162,7 +162,7 @@ async fn login_rejects_password_that_is_too_short() {
 
 #[tokio::test]
 async fn login_rejects_username_with_forbidden_characters() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     // Test with characters that UserName validation should reject
     let invalid_usernames = vec![
@@ -192,7 +192,7 @@ async fn login_rejects_username_with_forbidden_characters() {
 
 #[tokio::test]
 async fn login_does_not_leak_validation_vs_auth_failure() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     // Validation failure (empty username)
     let validation_payload = serde_json::json!({
@@ -230,7 +230,7 @@ async fn login_does_not_leak_validation_vs_auth_failure() {
 
 #[tokio::test]
 async fn login_rejects_wrong_field_names() {
-    let app = spawn_app().await;
+    let app = helpers::spawn_app().await;
 
     // Using "username" instead of "user_name"
     let payload = serde_json::json!({
