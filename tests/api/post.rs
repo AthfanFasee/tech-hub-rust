@@ -8,7 +8,7 @@ use uuid::Uuid;
 // ============================================================================
 
 #[tokio::test]
-async fn user_must_be_logged_in_to_create_post() {
+async fn create_post_returns_401_for_unauthenticated_users() {
     let app = helpers::spawn_app().await;
 
     let payload = serde_json::json!({
@@ -87,9 +87,9 @@ async fn create_post_persists_valid_post_and_returns_201() {
         "#,
         "My first blog posts"
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Failed to fetch saved posts.");
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to fetch saved posts.");
 
     assert_eq!(saved.title, "My first blog posts");
     assert_eq!(saved.post_text, "This is a test posts");
@@ -106,7 +106,7 @@ async fn create_post_persists_valid_post_and_returns_201() {
 // ============================================================================
 
 #[tokio::test]
-async fn user_must_be_logged_in_to_update_post() {
+async fn update_post_returns_401_for_unauthenticated_users() {
     let app = helpers::spawn_app().await;
     let post_id = Uuid::new_v4();
 
@@ -126,7 +126,7 @@ async fn user_must_be_logged_in_to_update_post() {
 }
 
 #[tokio::test]
-async fn non_creator_non_admin_cannot_update_post() {
+async fn update_post_returns_403_for_non_creator_non_admin() {
     let app = helpers::spawn_app().await;
     app.login().await;
 
@@ -153,7 +153,7 @@ async fn non_creator_non_admin_cannot_update_post() {
 }
 
 #[tokio::test]
-async fn admin_can_update_post_created_by_someone_else() {
+async fn update_post_allows_admin_to_update_every_post() {
     let app = helpers::spawn_app().await;
     app.login().await;
 
@@ -177,7 +177,7 @@ async fn admin_can_update_post_created_by_someone_else() {
 }
 
 #[tokio::test]
-async fn update_post_returns_403_for_nonexistent_id_when_unauthorized() {
+async fn update_post_returns_403_for_nonexistent_post_id_when_unauthorized() {
     let app = helpers::spawn_app().await;
 
     app.login().await; // normal user
@@ -193,12 +193,12 @@ async fn update_post_returns_403_for_nonexistent_id_when_unauthorized() {
     assert_eq!(
         403,
         response.status().as_u16(),
-        "Unauthorized users should not learn whether a post exists"
+        "Unauthorized users should see 403 and not learn whether a post exists or not"
     );
 }
 
 #[tokio::test]
-async fn update_post_returns_404_for_nonexistent_id_when_authorized() {
+async fn update_post_returns_404_for_nonexistent_post_id_when_authorized() {
     let app = helpers::spawn_app().await;
     app.login_admin().await;
 
@@ -273,9 +273,9 @@ async fn update_post_persists_changes_and_returns_200() {
         "#,
         post_id
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Failed to fetch updated posts");
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to fetch updated posts");
 
     assert_eq!(record.title, "Updated Title");
     assert_eq!(record.post_text, "Updated posts content");
@@ -313,7 +313,7 @@ async fn delete_post_marks_post_as_deleted() {
 }
 
 #[tokio::test]
-async fn post_can_only_be_deleted_by_creator_or_an_admin() {
+async fn delete_post_allows_post_creator_or_admin_only() {
     let app = helpers::spawn_app().await;
     app.login().await;
 
@@ -353,7 +353,7 @@ async fn post_can_only_be_deleted_by_creator_or_an_admin() {
 }
 
 #[tokio::test]
-async fn forbidden_delete_post_request_does_not_leak_ownership_information() {
+async fn delete_post_returns_403_for_non_author_without_leaking_ownership_information() {
     let app = helpers::spawn_app().await;
     app.login().await;
 
@@ -392,7 +392,7 @@ async fn forbidden_delete_post_request_does_not_leak_ownership_information() {
 }
 
 #[tokio::test]
-async fn delete_post_returns_404_for_nonexistent_id_for_admin() {
+async fn delete_post_returns_404_for_nonexistent_post_id_for_admin() {
     let app = helpers::spawn_app().await;
     app.login_admin().await;
 
@@ -407,7 +407,7 @@ async fn delete_post_returns_404_for_nonexistent_id_for_admin() {
 }
 
 #[tokio::test]
-async fn delete_post_returns_403_for_nonexistent_id_for_non_admin_user() {
+async fn delete_post_returns_403_for_nonexistent_post_id() {
     let app = helpers::spawn_app().await;
     app.login().await;
 
@@ -439,7 +439,7 @@ async fn delete_post_returns_404_if_already_deleted() {
 }
 
 #[tokio::test]
-async fn delete_post_requires_authentication() {
+async fn delete_post_returns_401_for_unauthenticated_users() {
     let app = helpers::spawn_app().await;
 
     let random_id = Uuid::new_v4();
@@ -457,7 +457,7 @@ async fn delete_post_requires_authentication() {
 // ============================================================================
 
 #[tokio::test]
-async fn hard_delete_post_removes_from_database() {
+async fn hard_delete_post_removes_post_from_database() {
     let app = helpers::spawn_app().await;
     app.login_admin().await;
 
@@ -482,7 +482,7 @@ async fn hard_delete_post_removes_from_database() {
 }
 
 #[tokio::test]
-async fn hard_delete_requires_admin_privileges() {
+async fn hard_delete_post_returns_403_for_non_admins() {
     let app = helpers::spawn_app().await;
     app.login().await;
 
@@ -504,7 +504,7 @@ async fn hard_delete_requires_admin_privileges() {
 }
 
 #[tokio::test]
-async fn hard_delete_returns_404_for_nonexistent_post() {
+async fn hard_delete_post_returns_404_for_nonexistent_post() {
     let app = helpers::spawn_app().await;
     app.login_admin().await;
 
@@ -523,7 +523,7 @@ async fn hard_delete_returns_404_for_nonexistent_post() {
 // ============================================================================
 
 #[tokio::test]
-async fn like_post_adds_user_to_liked_by() {
+async fn like_post_adds_user_to_liked_by_list_of_post() {
     let app = helpers::spawn_app().await;
     app.login().await;
 
@@ -541,9 +541,9 @@ async fn like_post_adds_user_to_liked_by() {
         "#,
         post_id
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Failed to fetch posts after like");
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to fetch posts after like");
 
     assert!(
         record.liked_by.contains(&user_id),
@@ -571,13 +571,13 @@ async fn like_post_is_idempotent_for_same_user() {
         "#,
         post_id
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Failed to fetch posts after like");
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to fetch posts after like");
 
     let count = record.liked_by.iter().filter(|&&id| id == user_id).count();
 
-    assert_eq!(count, 1, "Expected exactly one like from this user");
+    assert_eq!(count, 1, "Expected exactly one like from same user");
 }
 
 #[tokio::test]
@@ -596,7 +596,7 @@ async fn like_post_returns_404_for_nonexistent_post() {
 }
 
 #[tokio::test]
-async fn like_post_returns_401_if_unauthenticated() {
+async fn like_post_returns_401_for_unauthenticated_users() {
     let app = helpers::spawn_app().await;
     app.login().await;
 
@@ -616,7 +616,7 @@ async fn like_post_returns_401_if_unauthenticated() {
 // ============================================================================
 
 #[tokio::test]
-async fn dislike_post_removes_user_from_liked_by() {
+async fn dislike_post_removes_user_from_liked_by_list_of_post() {
     let app = helpers::spawn_app().await;
     app.login().await;
 
@@ -636,9 +636,9 @@ async fn dislike_post_removes_user_from_liked_by() {
         "#,
         post_id
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Failed to fetch posts after dislike");
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to fetch posts after dislike");
 
     assert!(
         !record.liked_by.contains(&user_id),
@@ -662,7 +662,7 @@ async fn dislike_post_returns_404_for_nonexistent_post() {
 }
 
 #[tokio::test]
-async fn dislike_post_returns_401_if_unauthenticated() {
+async fn dislike_post_returns_401_for_unauthenticated_users() {
     let app = helpers::spawn_app().await;
     app.login().await;
 
@@ -714,7 +714,7 @@ async fn get_post_returns_404_for_nonexistent_post() {
 }
 
 #[tokio::test]
-async fn get_post_does_return_200_if_unauthenticated() {
+async fn get_post_returns_200_for_unauthenticated_users() {
     let app = helpers::spawn_app().await;
     app.login().await;
 
@@ -730,7 +730,7 @@ async fn get_post_does_return_200_if_unauthenticated() {
 }
 
 #[tokio::test]
-async fn get_post_does_not_return_deleted_posts() {
+async fn get_post_returns_404_for_deleted_posts() {
     let app = helpers::spawn_app().await;
     app.login().await;
 
@@ -745,9 +745,9 @@ async fn get_post_does_not_return_deleted_posts() {
         "#,
         post_id
     )
-    .execute(&app.db_pool)
-    .await
-    .expect("Failed to soft delete posts");
+        .execute(&app.db_pool)
+        .await
+        .expect("Failed to soft delete posts");
 
     let response = app.get_post(&post_id).await;
 

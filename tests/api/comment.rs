@@ -97,7 +97,7 @@ async fn create_comment_returns_401_if_unauthenticated() {
 // ============================================================================
 
 #[tokio::test]
-async fn show_comments_for_post_returns_200_and_list() {
+async fn get_comments_returns_200_with_comment_list() {
     let app = helpers::spawn_app().await;
     app.login().await;
 
@@ -128,7 +128,7 @@ async fn show_comments_for_post_returns_200_and_list() {
 }
 
 #[tokio::test]
-async fn show_comments_returns_empty_array_for_post_with_no_comments() {
+async fn get_comments_returns_empty_array_for_post_with_no_comments() {
     let app = helpers::spawn_app().await;
     app.login().await;
 
@@ -173,7 +173,7 @@ async fn delete_comment_returns_401_if_unauthenticated() {
 }
 
 #[tokio::test]
-async fn comment_can_only_be_deleted_by_creator_or_admin() {
+async fn delete_comment_only_creator_or_admin_can_delete_comment() {
     let app = helpers::spawn_app().await;
     app.login().await;
 
@@ -214,9 +214,9 @@ async fn comment_can_only_be_deleted_by_creator_or_admin() {
         "SELECT COUNT(*) AS count FROM comments WHERE id = $1",
         comment_id
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Failed to check DB");
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to check DB");
 
     assert_eq!(record.count.unwrap(), 0, "Comment should be deleted");
 }
@@ -245,9 +245,9 @@ async fn delete_comment_removes_comment_successfully() {
         "SELECT COUNT(*) AS count FROM comments WHERE id = $1",
         comment_id
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Failed to check DB");
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to check DB");
 
     assert_eq!(record.count.unwrap(), 0);
 }

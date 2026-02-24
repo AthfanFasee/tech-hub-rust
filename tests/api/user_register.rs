@@ -4,7 +4,7 @@ use wiremock::matchers;
 use wiremock::{Mock, ResponseTemplate};
 
 #[tokio::test]
-async fn register_user_persists_the_new_user_and_returns_a_200_for_valid_json_data() {
+async fn register_user_persists_new_user_and_returns_200_for_valid_data() {
     let app = helpers::spawn_app().await;
 
     let user = TestUser::generate();
@@ -31,9 +31,9 @@ async fn register_user_persists_the_new_user_and_returns_a_200_for_valid_json_da
         "#,
         user.email,
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Failed to fetch saved user data.");
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to fetch saved user data.");
 
     assert_eq!(saved.email, user.email);
     assert_eq!(saved.user_name, user.user_name);
@@ -42,7 +42,7 @@ async fn register_user_persists_the_new_user_and_returns_a_200_for_valid_json_da
 }
 
 #[tokio::test]
-async fn register_user_can_login_using_their_credentials() {
+async fn register_user_allows_login_with_registered_credentials() {
     let app = helpers::spawn_app().await;
     let user = TestUser::generate();
     let payload = serde_json::json!({
@@ -84,7 +84,7 @@ async fn register_user_can_login_using_their_credentials() {
 }
 
 #[tokio::test]
-async fn register_user_returns_a_400_when_data_is_missing() {
+async fn register_user_returns_400_when_required_fields_are_missing() {
     let app = helpers::spawn_app().await;
 
     let user = TestUser::generate();
@@ -115,7 +115,7 @@ async fn register_user_returns_a_400_when_data_is_missing() {
 }
 
 #[tokio::test]
-async fn register_user_returns_a_400_when_data_is_present_but_invalid() {
+async fn register_user_returns_400_when_fields_are_invalid() {
     let app = helpers::spawn_app().await;
 
     let user = TestUser::generate();
@@ -153,7 +153,7 @@ async fn register_user_returns_a_400_when_data_is_present_but_invalid() {
 }
 
 #[tokio::test]
-async fn register_user_sends_a_confirmation_email_with_a_link() {
+async fn register_user_sends_confirmation_email_with_activation_link() {
     let app = helpers::spawn_app().await;
     let user = TestUser::generate();
     let payload = serde_json::json!({
@@ -200,7 +200,7 @@ async fn register_user_returns_500_if_email_sending_fails() {
 }
 
 #[tokio::test]
-async fn register_user_fails_if_there_is_a_fatal_database_error() {
+async fn register_user_returns_500_on_fatal_database_error() {
     let app = helpers::spawn_app().await;
     let user = TestUser::generate();
     let payload = serde_json::json!({
@@ -220,7 +220,7 @@ async fn register_user_fails_if_there_is_a_fatal_database_error() {
 }
 
 #[tokio::test]
-async fn clicking_on_the_confirmation_link_activates_a_user_in_db() {
+async fn confirmation_link_via_email_activates_a_user() {
     let app = helpers::spawn_app().await;
 
     let user = TestUser::generate();
@@ -256,9 +256,9 @@ async fn clicking_on_the_confirmation_link_activates_a_user_in_db() {
         "#,
         user.email,
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Failed to fetch saved user data.");
+        .fetch_one(&app.db_pool)
+        .await
+        .expect("Failed to fetch saved user data.");
 
     assert_eq!(saved.email, user.email);
     assert_eq!(saved.user_name, user.user_name);
@@ -266,7 +266,7 @@ async fn clicking_on_the_confirmation_link_activates_a_user_in_db() {
 }
 
 #[tokio::test]
-async fn confirm_activation_requests_without_token_are_rejected_with_a_400() {
+async fn confirm_user_activation_returns_400_when_token_is_missing() {
     let app = helpers::spawn_app().await;
 
     let response = reqwest::get(&format!("{}/v1/user/confirm/register", app.address))
@@ -276,20 +276,20 @@ async fn confirm_activation_requests_without_token_are_rejected_with_a_400() {
 }
 
 #[tokio::test]
-async fn confirm_user_with_invalid_token_returns_401() {
+async fn confirm_user_activation_returns_401_for_invalid_activation_token() {
     let app = helpers::spawn_app().await;
 
     let response = reqwest::get(&format!(
         "{}/v1/user/confirm/register?token=not-a-real-token",
         app.address
     ))
-    .await
-    .unwrap();
+        .await
+        .unwrap();
     assert_eq!(response.status().as_u16(), 401);
 }
 
 #[tokio::test]
-async fn activation_token_is_deleted_after_successful_confirmation() {
+async fn confirm_user_activation_deletes_activation_token_after_successful_confirmation() {
     let app = helpers::spawn_app().await;
     let user = TestUser::generate();
     let payload = serde_json::json!({
@@ -320,9 +320,9 @@ async fn activation_token_is_deleted_after_successful_confirmation() {
         r#"SELECT COUNT(*) as count FROM tokens WHERE user_id = $1 AND is_activation = true"#,
         app.test_user.user_id,
     )
-    .fetch_one(&app.db_pool)
-    .await
-    .unwrap();
+        .fetch_one(&app.db_pool)
+        .await
+        .unwrap();
 
     assert_eq!(remaining_tokens.count, Some(0));
 }

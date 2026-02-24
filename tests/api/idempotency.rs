@@ -2,7 +2,7 @@ use crate::helpers;
 use techhub::newsletter_delivery_worker;
 
 #[tokio::test]
-async fn old_idempotency_records_are_cleaned_up() {
+async fn cleanup_old_idempotency_records_deletes_records_older_than_48_hours() {
     let app = helpers::spawn_app().await;
     let pool = &app.db_pool;
 
@@ -15,9 +15,9 @@ async fn old_idempotency_records_are_cleaned_up() {
         app.test_user.user_id,
         "old-key"
     )
-    .execute(pool)
-    .await
-    .unwrap();
+        .execute(pool)
+        .await
+        .unwrap();
 
     // Insert one recent record (newer than 24h)
     sqlx::query!(
@@ -28,9 +28,9 @@ async fn old_idempotency_records_are_cleaned_up() {
         app.test_user.user_id,
         "new-key"
     )
-    .execute(pool)
-    .await
-    .unwrap();
+        .execute(pool)
+        .await
+        .unwrap();
 
     newsletter_delivery_worker::cleanup_old_idempotency_records(pool)
         .await
@@ -41,10 +41,10 @@ async fn old_idempotency_records_are_cleaned_up() {
         r#"SELECT EXISTS(SELECT 1 FROM idempotency WHERE idempotency_key = $1)"#,
         "old-key"
     )
-    .fetch_one(pool)
-    .await
-    .unwrap()
-    .unwrap();
+        .fetch_one(pool)
+        .await
+        .unwrap()
+        .unwrap();
     assert!(!old_exists, "Old record was not deleted");
 
     // The recent record should still exist
@@ -52,9 +52,9 @@ async fn old_idempotency_records_are_cleaned_up() {
         r#"SELECT EXISTS(SELECT 1 FROM idempotency WHERE idempotency_key = $1)"#,
         "new-key"
     )
-    .fetch_one(pool)
-    .await
-    .unwrap()
-    .unwrap();
+        .fetch_one(pool)
+        .await
+        .unwrap()
+        .unwrap();
     assert!(new_exists, "Recent record was wrongly deleted");
 }
