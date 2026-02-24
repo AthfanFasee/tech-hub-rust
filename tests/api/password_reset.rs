@@ -1,5 +1,5 @@
-use uuid::Uuid;
 use crate::helpers;
+use uuid::Uuid;
 
 #[tokio::test]
 async fn user_must_be_logged_in_to_change_their_password() {

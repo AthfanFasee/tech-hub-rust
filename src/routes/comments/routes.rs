@@ -6,7 +6,10 @@ use actix_web::web;
 pub fn comment_routes(cfg: &mut web::ServiceConfig) {
     cfg
         // Public routes
-        .route("/get/posts/{id}", web::get().to(routes::show_comments_for_post))
+        .route(
+            "/get/posts/{id}",
+            web::get().to(routes::show_comments_for_post),
+        )
         // Protected routes (require authentication)
         .service(
             web::scope("/me")

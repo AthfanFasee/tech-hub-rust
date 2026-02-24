@@ -4,7 +4,7 @@ use crate::domain::{
 };
 use crate::utils;
 use actix_web::http::StatusCode;
-use actix_web::{web, HttpResponse, ResponseError};
+use actix_web::{HttpResponse, ResponseError, web};
 use anyhow::Context;
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
@@ -79,10 +79,10 @@ pub async fn get_comments_for_post(
         ORDER BY c.id DESC
         "#,
     )
-        .bind(post_id)
-        .fetch_all(pool)
-        .await
-        .context("Failed to load comments for posts")?;
+    .bind(post_id)
+    .fetch_all(pool)
+    .await
+    .context("Failed to load comments for posts")?;
 
     let comments = rows.into_iter().map(CommentResponseBody::from).collect();
 
@@ -134,9 +134,9 @@ pub async fn insert_comment(
         comment.post_id,
         user_id
     )
-        .fetch_one(pool)
-        .await
-        .context("Failed to insert comment")?;
+    .fetch_one(pool)
+    .await
+    .context("Failed to insert comment")?;
 
     Ok((record.id, record.created_at))
 }
@@ -174,9 +174,9 @@ pub async fn delete_comment_db(id: Uuid, pool: &PgPool) -> Result<(), CommentErr
         "#,
         id
     )
-        .execute(pool)
-        .await
-        .context("Failed to delete comment")?;
+    .execute(pool)
+    .await
+    .context("Failed to delete comment")?;
 
     if result.rows_affected() == 0 {
         return Err(CommentError::NotFound);
@@ -203,9 +203,9 @@ pub async fn did_user_create_the_comment(
         comment_id,
         user_id
     )
-        .fetch_one(pool)
-        .await
-        .context("Failed to check if user created this comment")?;
+    .fetch_one(pool)
+    .await
+    .context("Failed to check if user created this comment")?;
 
     Ok(result)
 }

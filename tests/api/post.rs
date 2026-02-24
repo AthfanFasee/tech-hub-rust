@@ -86,9 +86,9 @@ async fn create_post_persists_valid_post_and_returns_201() {
         "#,
         "My first blog posts"
     )
-        .fetch_one(&app.db_pool)
-        .await
-        .expect("Failed to fetch saved posts.");
+    .fetch_one(&app.db_pool)
+    .await
+    .expect("Failed to fetch saved posts.");
 
     assert_eq!(saved.title, "My first blog posts");
     assert_eq!(saved.post_text, "This is a test posts");
@@ -272,9 +272,9 @@ async fn update_post_persists_changes_and_returns_200() {
         "#,
         post_id
     )
-        .fetch_one(&app.db_pool)
-        .await
-        .expect("Failed to fetch updated posts");
+    .fetch_one(&app.db_pool)
+    .await
+    .expect("Failed to fetch updated posts");
 
     assert_eq!(record.title, "Updated Title");
     assert_eq!(record.post_text, "Updated posts content");
@@ -540,9 +540,9 @@ async fn like_post_adds_user_to_liked_by() {
         "#,
         post_id
     )
-        .fetch_one(&app.db_pool)
-        .await
-        .expect("Failed to fetch posts after like");
+    .fetch_one(&app.db_pool)
+    .await
+    .expect("Failed to fetch posts after like");
 
     assert!(
         record.liked_by.contains(&user_id),
@@ -570,9 +570,9 @@ async fn like_post_is_idempotent_for_same_user() {
         "#,
         post_id
     )
-        .fetch_one(&app.db_pool)
-        .await
-        .expect("Failed to fetch posts after like");
+    .fetch_one(&app.db_pool)
+    .await
+    .expect("Failed to fetch posts after like");
 
     let count = record.liked_by.iter().filter(|&&id| id == user_id).count();
 
@@ -635,9 +635,9 @@ async fn dislike_post_removes_user_from_liked_by() {
         "#,
         post_id
     )
-        .fetch_one(&app.db_pool)
-        .await
-        .expect("Failed to fetch posts after dislike");
+    .fetch_one(&app.db_pool)
+    .await
+    .expect("Failed to fetch posts after dislike");
 
     assert!(
         !record.liked_by.contains(&user_id),
@@ -744,9 +744,9 @@ async fn get_post_does_not_return_deleted_posts() {
         "#,
         post_id
     )
-        .execute(&app.db_pool)
-        .await
-        .expect("Failed to soft delete posts");
+    .execute(&app.db_pool)
+    .await
+    .expect("Failed to soft delete posts");
 
     let response = app.get_post(&post_id).await;
 

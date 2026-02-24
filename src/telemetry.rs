@@ -1,9 +1,9 @@
 use std::io::{self, Write};
 use tokio::task::JoinHandle;
-use tracing::{subscriber, Subscriber};
+use tracing::{Subscriber, subscriber};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_log::LogTracer;
-use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt, fmt::MakeWriter};
+use tracing_subscriber::{EnvFilter, Registry, fmt::MakeWriter, layer::SubscriberExt};
 
 pub fn get_subscriber<Sink>(
     name: String,

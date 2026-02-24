@@ -5,9 +5,9 @@ use crate::email_client::EmailError;
 use crate::startup::ApplicationBaseUrl;
 use crate::telemetry;
 use crate::utils;
-use actix_web::http::StatusCode;
 use actix_web::ResponseError;
-use actix_web::{web, HttpResponse};
+use actix_web::http::StatusCode;
+use actix_web::{HttpResponse, web};
 use anyhow::Context;
 use secrecy::ExposeSecret;
 use sqlx::{Executor, PgPool, Postgres, Transaction};
@@ -99,10 +99,11 @@ pub async fn insert_user(
     password: UserPassword,
     transaction: &mut Transaction<'_, Postgres>,
 ) -> Result<Uuid, anyhow::Error> {
-    let password_hash =
-        telemetry::spawn_blocking_with_tracing(move || authentication::compute_password_hash(password.into_secret()))
-            .await?
-            .context("Failed to hash password")?;
+    let password_hash = telemetry::spawn_blocking_with_tracing(move || {
+        authentication::compute_password_hash(password.into_secret())
+    })
+    .await?
+    .context("Failed to hash password")?;
 
     let user_id = Uuid::new_v4();
     let query = sqlx::query!(
@@ -156,7 +157,7 @@ pub async fn send_confirmation_email(
 ) -> Result<(), EmailError> {
     let confirmation_link = format!("{base_url}/v1/user/confirm/register?token={token}");
     let plain_body =
-        format!("Welcome to TechHub!\nVisit {confirmation_link} to confirm your registration.", );
+        format!("Welcome to TechHub!\nVisit {confirmation_link} to confirm your registration.",);
     let html_body = format!(
         "Welcome to TechHub!<br />\
         Click <a href=\"{confirmation_link}\">here</a> to confirm your subscription.",
@@ -234,9 +235,9 @@ pub async fn activate_user_and_delete_token(
         user_id,
         token,
     )
-        .execute(pool)
-        .await
-        .context("Failed to update the user status as activated")?;
+    .execute(pool)
+    .await
+    .context("Failed to update the user status as activated")?;
 
     Ok(())
 }
@@ -250,8 +251,8 @@ pub async fn get_user_id_from_token(
             WHERE token = $1",
         token,
     )
-        .fetch_optional(pool)
-        .await
-        .context("Failed to retrieve the user id associated with the provided token.")?;
+    .fetch_optional(pool)
+    .await
+    .context("Failed to retrieve the user id associated with the provided token.")?;
     Ok(result.map(|r| r.user_id))
 }

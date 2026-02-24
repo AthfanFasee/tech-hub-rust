@@ -1,7 +1,7 @@
 use crate::authentication::UserId;
 use crate::domain::{NewsLetterData, Newsletter};
-use crate::idempotency::{IdempotencyKey, NextAction};
 use crate::idempotency;
+use crate::idempotency::{IdempotencyKey, NextAction};
 use crate::utils;
 use actix_web::http::StatusCode;
 use actix_web::{HttpRequest, HttpResponse, ResponseError, web};
@@ -72,12 +72,13 @@ pub async fn publish_newsletter(
         .try_into()
         .map_err(PublishError::BadRequest)?;
 
-    let mut transaction = match idempotency::try_processing(&pool, &idempotency_key, *user_id).await? {
-        NextAction::StartProcessing(t) => t,
-        NextAction::ReturnSavedResponse(saved_response) => {
-            return Ok(saved_response);
-        }
-    };
+    let mut transaction =
+        match idempotency::try_processing(&pool, &idempotency_key, *user_id).await? {
+            NextAction::StartProcessing(t) => t,
+            NextAction::ReturnSavedResponse(saved_response) => {
+                return Ok(saved_response);
+            }
+        };
 
     let issue_id = insert_newsletter_issue(
         &mut transaction,
@@ -90,7 +91,8 @@ pub async fn publish_newsletter(
     enqueue_delivery_tasks(&mut transaction, issue_id).await?;
 
     let response = HttpResponse::Ok().finish();
-    let response = idempotency::save_response(transaction, &idempotency_key, *user_id, response).await?;
+    let response =
+        idempotency::save_response(transaction, &idempotency_key, *user_id, response).await?;
     Ok(response)
 }
 

@@ -1,15 +1,15 @@
 use crate::configuration::{Configuration, DatabaseConfigs};
 use crate::email_client::EmailClient;
 use crate::routes;
-use actix_session::storage::RedisSessionStore;
 use actix_session::SessionMiddleware;
-use actix_web::dev::Server;
-use actix_web::{web, web::Data, web::ServiceConfig, App, HttpServer};
+use actix_session::storage::RedisSessionStore;
 use actix_web::cookie::Key;
+use actix_web::dev::Server;
+use actix_web::{App, HttpServer, web, web::Data, web::ServiceConfig};
 use anyhow::Context;
 use secrecy::{ExposeSecret, Secret};
-use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
+use sqlx::postgres::PgPoolOptions;
 use std::net::TcpListener;
 use tracing_actix_web::TracingLogger;
 
@@ -39,8 +39,8 @@ impl Application {
             config.application.hmac_secret,
             config.application.redis_uri,
         )
-            .await
-            .context("Failed to run Actix web server")?;
+        .await
+        .context("Failed to run Actix web server")?;
 
         Ok(Self { port, server })
     }
@@ -92,9 +92,9 @@ async fn run(
             .app_data(email_client.clone())
             .app_data(base_url.clone())
     })
-        .listen(tcp_listener)
-        .with_context(|| "Failed to bind Actix server to TCP listener")?
-        .run();
+    .listen(tcp_listener)
+    .with_context(|| "Failed to bind Actix server to TCP listener")?
+    .run();
 
     Ok(server)
 }

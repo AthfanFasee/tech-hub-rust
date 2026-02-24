@@ -4,9 +4,9 @@ use crate::domain::{
     Post, PostQuery, PostRecord, PostResponse, QueryTitle, SortDirection, Text, Title,
 };
 use crate::utils;
-use actix_web::http::StatusCode;
 use actix_web::ResponseError;
-use actix_web::{web, HttpResponse};
+use actix_web::http::StatusCode;
+use actix_web::{HttpResponse, web};
 use anyhow::Context;
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
@@ -65,7 +65,7 @@ pub async fn get_all_posts(
         &parsed_query.filters,
         &pool,
     )
-        .await?;
+    .await?;
 
     let metadata = Metadata::calculate(
         total_records,
@@ -236,9 +236,9 @@ pub async fn insert_post_and_return_inserted_data(
         img.as_ref(),
         *created_by,
     )
-        .fetch_one(pool)
-        .await
-        .context("Failed to insert new posts into database")?;
+    .fetch_one(pool)
+    .await
+    .context("Failed to insert new posts into database")?;
     tracing::Span::current().record("post_id", tracing::field::display(&record.id));
     Ok((record.id, record.created_at))
 }
@@ -295,7 +295,7 @@ pub async fn update_post(
         post.version,
         &pool,
     )
-        .await?;
+    .await?;
 
     post.title = validated_post.title.as_ref().to_string();
     post.text = validated_post.text.as_ref().to_string();
@@ -325,9 +325,9 @@ async fn update_post_in_db(
         id,
         version
     )
-        .execute(pool)
-        .await
-        .context("Failed to execute update query")?;
+    .execute(pool)
+    .await
+    .context("Failed to execute update query")?;
 
     if result.rows_affected() == 0 {
         return Err(PostError::EditConflict);
@@ -369,9 +369,9 @@ pub async fn delete_post(
         Utc::now(),
         post_id
     )
-        .execute(&**pool)
-        .await
-        .context("Failed to mark posts as deleted")?;
+    .execute(&**pool)
+    .await
+    .context("Failed to mark posts as deleted")?;
 
     if result.rows_affected() == 0 {
         return Err(PostError::NotFound);
@@ -435,9 +435,9 @@ async fn add_like_to_post(post_id: Uuid, user_id: Uuid, pool: &PgPool) -> Result
         user_id,
         post_id
     )
-        .execute(pool)
-        .await
-        .context("Failed to add like to posts")?;
+    .execute(pool)
+    .await
+    .context("Failed to add like to posts")?;
 
     if result.rows_affected() == 0 {
         return Err(PostError::NotFound);
@@ -461,9 +461,9 @@ async fn remove_like_from_post(
         user_id,
         post_id
     )
-        .execute(pool)
-        .await
-        .context("Failed to remove like from posts")?;
+    .execute(pool)
+    .await
+    .context("Failed to remove like from posts")?;
 
     if result.rows_affected() == 0 {
         return Err(PostError::NotFound);
@@ -491,9 +491,9 @@ pub async fn did_user_create_the_post(
         post_id,
         user_id
     )
-        .fetch_one(pool)
-        .await
-        .context("Failed to check if user created this post")?;
+    .fetch_one(pool)
+    .await
+    .context("Failed to check if user created this post")?;
 
     Ok(result)
 }

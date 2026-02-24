@@ -85,7 +85,9 @@ pub async fn reject_non_admin_users(
     let is_admin = session
         .get_is_admin()
         .map_err(|e| utils::app_error(StatusCode::INTERNAL_SERVER_ERROR, e))?
-        .ok_or_else(|| utils::app_error(StatusCode::UNAUTHORIZED, "Missing admin flag in session"))?;
+        .ok_or_else(|| {
+            utils::app_error(StatusCode::UNAUTHORIZED, "Missing admin flag in session")
+        })?;
 
     if !is_admin {
         return Err(utils::app_error(

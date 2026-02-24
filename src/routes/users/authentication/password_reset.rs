@@ -1,5 +1,5 @@
-use crate::authentication::UserId;
 use crate::authentication;
+use crate::authentication::UserId;
 use crate::authentication::{AuthError, Credentials};
 use crate::domain::UserPassword;
 use crate::utils;

@@ -1,5 +1,5 @@
 use crate::authentication;
-use crate::authentication::{Credentials, AuthError};
+use crate::authentication::{AuthError, Credentials};
 use crate::domain::LoginData;
 use crate::session_state::TypedSession;
 use crate::utils;

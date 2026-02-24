@@ -1,7 +1,7 @@
 use crate::helpers::{ConfirmationLinks, TestApp, TestUser};
 use linkify::{LinkFinder, LinkKind};
 use reqwest::{Response, header::HeaderMap};
-use serde_json::{Value};
+use serde_json::Value;
 use uuid::Uuid;
 use wiremock::matchers;
 use wiremock::{Mock, Request, ResponseTemplate};

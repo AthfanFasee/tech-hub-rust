@@ -1,5 +1,5 @@
-use actix_web::{error, HttpResponse, http::StatusCode};
-use rand::{distributions::Alphanumeric, Rng};
+use actix_web::{HttpResponse, error, http::StatusCode};
+use rand::{Rng, distributions::Alphanumeric};
 use serde::Serialize;
 
 #[derive(Serialize)]

@@ -5,7 +5,7 @@ use crate::routes::users::authentication::user_register;
 use crate::startup::ApplicationBaseUrl;
 use crate::utils;
 use actix_web::http::StatusCode;
-use actix_web::{web, HttpResponse, ResponseError};
+use actix_web::{HttpResponse, ResponseError, web};
 use anyhow::Context;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -82,9 +82,9 @@ pub async fn subscribe_user_and_delete_token(
         user_id,
         token,
     )
-        .execute(pool)
-        .await
-        .context("Failed to update the user status as subscribed")?;
+    .execute(pool)
+    .await
+    .context("Failed to update the user status as subscribed")?;
 
     Ok(())
 }
@@ -146,9 +146,9 @@ pub async fn get_user_email(user_id: Uuid, pool: &PgPool) -> Result<String, anyh
         "#,
         user_id,
     )
-        .fetch_one(pool)
-        .await
-        .context("Failed to perform a query to retrieve a user email.")?;
+    .fetch_one(pool)
+    .await
+    .context("Failed to perform a query to retrieve a user email.")?;
     Ok(row.email)
 }
 
@@ -165,9 +165,9 @@ pub async fn store_subscription_token(
         user_id,
         true,
     )
-        .execute(pool)
-        .await
-        .context("Failed to store the user subscription token")?;
+    .execute(pool)
+    .await
+    .context("Failed to store the user subscription token")?;
 
     Ok(())
 }
