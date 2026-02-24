@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Display};
 use techhub::configuration;
 use techhub::newsletter_delivery_worker::run_worker_until_stopped;
-use techhub::startup::Application;
+use techhub::startup;
 use techhub::telemetry;
 use tokio::task::JoinError;
 
@@ -16,7 +16,7 @@ async fn try_main() -> anyhow::Result<()> {
     let subscriber = telemetry::get_subscriber("techhub".into(), "info".into(), std::io::stdout);
     telemetry::init_subscriber(subscriber);
     let config = configuration::get_config().expect("Failed to read config");
-    let application = Application::build(config.clone()).await?;
+    let application = startup::Application::build(config.clone()).await?;
 
     let application_task = tokio::spawn(application.run_until_stopped());
     let worker_task = tokio::spawn(run_worker_until_stopped(config));

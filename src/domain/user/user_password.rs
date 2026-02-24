@@ -34,7 +34,7 @@ impl UserPassword {
 
 #[cfg(test)]
 mod tests {
-    use crate::domain::UserPassword;
+    use super::UserPassword;
     use claims::{assert_err, assert_ok};
     use proptest::prelude::*;
     use unicode_segmentation::UnicodeSegmentation;

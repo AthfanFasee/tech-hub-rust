@@ -39,7 +39,7 @@ impl std::fmt::Display for UserName {
 
 #[cfg(test)]
 mod tests {
-    use crate::domain::UserName;
+    use super::UserName;
     use claims::{assert_err, assert_ok};
     use proptest::prelude::*;
     use unicode_segmentation::UnicodeSegmentation;
