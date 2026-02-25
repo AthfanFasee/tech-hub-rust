@@ -1,28 +1,28 @@
-mod img;
+mod post_img;
+mod post_text;
+mod post_title;
 mod requests;
-mod text;
-mod title;
 mod types;
 
-pub use img::Img;
+pub use post_img::PostImg;
+pub use post_text::PostText;
+pub use post_title::PostTitle;
 pub use requests::*;
-pub use text::Text;
-pub use title::Title;
 pub use types::*;
 
 #[derive(Debug)]
 pub struct Post {
-    pub title: Title,
-    pub text: Text,
-    pub img: Img,
+    pub title: PostTitle,
+    pub text: PostText,
+    pub img: PostImg,
 }
 
 impl Post {
     pub fn new(title: String, text: String, img: String) -> Result<Self, String> {
         Ok(Self {
-            title: Title::parse(title)?,
-            text: Text::parse(text)?,
-            img: Img::parse(img)?,
+            title: PostTitle::parse(title)?,
+            text: PostText::parse(text)?,
+            img: PostImg::parse(img)?,
         })
     }
 }

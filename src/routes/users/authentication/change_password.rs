@@ -14,7 +14,7 @@ use std::fmt::{Debug, Formatter};
 use uuid::Uuid;
 
 #[derive(thiserror::Error)]
-pub enum PasswordResetError {
+pub enum ChangePasswordError {
     #[error("Authentication failed")]
     AuthError(#[source] anyhow::Error),
     #[error("Invalid request: {0}")]
@@ -23,18 +23,18 @@ pub enum PasswordResetError {
     UnexpectedError(#[from] anyhow::Error),
 }
 
-impl Debug for PasswordResetError {
+impl Debug for ChangePasswordError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         utils::error_chain_fmt(self, f)
     }
 }
 
-impl ResponseError for PasswordResetError {
+impl ResponseError for ChangePasswordError {
     fn error_response(&self) -> HttpResponse {
         let status_code = match self {
-            PasswordResetError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            PasswordResetError::AuthError(_) => StatusCode::UNAUTHORIZED,
-            PasswordResetError::BadRequest(_) => StatusCode::BAD_REQUEST,
+            ChangePasswordError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            ChangePasswordError::AuthError(_) => StatusCode::UNAUTHORIZED,
+            ChangePasswordError::BadRequest(_) => StatusCode::BAD_REQUEST,
         };
 
         utils::build_error_response(status_code, self.to_string())
@@ -42,15 +42,15 @@ impl ResponseError for PasswordResetError {
 }
 
 #[derive(serde::Deserialize)]
-pub struct PasswordResetData {
+pub struct ChangePasswordData {
     current_password: Secret<String>,
     new_password: Secret<String>,
 }
 
-impl TryFrom<PasswordResetData> for (UserPassword, UserPassword) {
+impl TryFrom<ChangePasswordData> for (UserPassword, UserPassword) {
     type Error = String;
 
-    fn try_from(payload: PasswordResetData) -> Result<Self, Self::Error> {
+    fn try_from(payload: ChangePasswordData) -> Result<Self, Self::Error> {
         let current_password =
             UserPassword::parse(payload.current_password.expose_secret().to_string())?;
         let new_password = UserPassword::parse(payload.new_password.expose_secret().to_string())?;
@@ -63,17 +63,17 @@ impl TryFrom<PasswordResetData> for (UserPassword, UserPassword) {
     fields(user_id=%&*user_id)
 )]
 pub async fn change_password(
-    payload: web::Json<PasswordResetData>,
+    payload: web::Json<ChangePasswordData>,
     pool: web::Data<PgPool>,
     user_id: web::ReqData<UserId>,
-) -> Result<HttpResponse, PasswordResetError> {
+) -> Result<HttpResponse, ChangePasswordError> {
     let user_id = user_id.into_inner();
     let username = get_username(*user_id, &pool).await?;
 
     let (current_password, new_password) = payload
         .0
         .try_into()
-        .map_err(PasswordResetError::BadRequest)?;
+        .map_err(ChangePasswordError::BadRequest)?;
 
     let credentials = Credentials {
         user_name: username,
@@ -82,8 +82,8 @@ pub async fn change_password(
 
     if let Err(e) = authentication::validate_credentials(credentials, &pool).await {
         return match e {
-            AuthError::InvalidCredentials(_) => Err(PasswordResetError::AuthError(e.into())),
-            AuthError::UnexpectedError(_) => Err(PasswordResetError::UnexpectedError(e.into())),
+            AuthError::InvalidCredentials(_) => Err(ChangePasswordError::AuthError(e.into())),
+            AuthError::UnexpectedError(_) => Err(ChangePasswordError::UnexpectedError(e.into())),
         };
     }
 

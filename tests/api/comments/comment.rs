@@ -214,9 +214,9 @@ async fn delete_comment_only_creator_or_admin_can_delete_comment() {
         "SELECT COUNT(*) AS count FROM comments WHERE id = $1",
         comment_id
     )
-        .fetch_one(&app.db_pool)
-        .await
-        .expect("Failed to check DB");
+    .fetch_one(&app.db_pool)
+    .await
+    .expect("Failed to check DB");
 
     assert_eq!(record.count.unwrap(), 0, "Comment should be deleted");
 }
@@ -245,9 +245,9 @@ async fn delete_comment_removes_comment_successfully() {
         "SELECT COUNT(*) AS count FROM comments WHERE id = $1",
         comment_id
     )
-        .fetch_one(&app.db_pool)
-        .await
-        .expect("Failed to check DB");
+    .fetch_one(&app.db_pool)
+    .await
+    .expect("Failed to check DB");
 
     assert_eq!(record.count.unwrap(), 0);
 }

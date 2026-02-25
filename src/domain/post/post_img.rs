@@ -2,9 +2,9 @@ use std::fmt;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug)]
-pub struct Img(String);
+pub struct PostImg(String);
 
-impl Img {
+impl PostImg {
     pub fn parse(s: String) -> Result<Self, String> {
         let trimmed = s.trim();
 
@@ -32,13 +32,13 @@ impl Img {
     }
 }
 
-impl AsRef<str> for Img {
+impl AsRef<str> for PostImg {
     fn as_ref(&self) -> &str {
         &self.0
     }
 }
 
-impl Display for Img {
+impl Display for PostImg {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }
@@ -46,32 +46,32 @@ impl Display for Img {
 
 #[cfg(test)]
 mod tests {
-    use super::Img;
+    use super::PostImg;
     use claims::assert_err;
     use proptest::prelude::*;
 
     // Example-based tests
     #[test]
     fn empty_img_is_rejected() {
-        let result = Img::parse("".into());
+        let result = PostImg::parse("".into());
         assert_err!(result);
     }
 
     #[test]
     fn img_without_http_protocol_is_rejected() {
-        let result = Img::parse("storage/images/abc123".into());
+        let result = PostImg::parse("storage/images/abc123".into());
         assert_err!(result);
     }
 
     #[test]
     fn img_with_forbidden_chars_is_rejected() {
-        let result = Img::parse("https://example.com/path\nwith\nnewlines".into());
+        let result = PostImg::parse("https://example.com/path\nwith\nnewlines".into());
         assert_err!(result);
     }
 
     #[test]
     fn img_with_spaces_is_rejected() {
-        let result = Img::parse("https://example.com/path with spaces".into());
+        let result = PostImg::parse("https://example.com/path with spaces".into());
         assert_err!(result);
     }
 
@@ -83,7 +83,7 @@ mod tests {
             path in r"[a-zA-Z0-9/_.-]{1,100}",
         ) {
             let img = format!("https://{}/{}", domain, path);
-            let result = Img::parse(img);
+            let result = PostImg::parse(img);
             prop_assert!(result.is_ok());
         }
 
@@ -93,7 +93,7 @@ mod tests {
             path in r"[a-zA-Z0-9/_.-]{1,100}",
         ) {
             let img = format!("https://{}/{}", domain, path);
-            let result = Img::parse(img);
+            let result = PostImg::parse(img);
             prop_assert!(result.is_ok());
         }
 
@@ -102,7 +102,7 @@ mod tests {
             path in r"[a-zA-Z0-9/_-]{1,50}",
         ) {
             // Paths without https:// or https:// should be rejected
-            let result = Img::parse(path);
+            let result = PostImg::parse(path);
             prop_assert!(result.is_err());
         }
 
@@ -111,7 +111,7 @@ mod tests {
             domain in r"[a-z]{3,20}",
         ) {
             let img = format!("https://{}.com/path with spaces", domain);
-            let result = Img::parse(img);
+            let result = PostImg::parse(img);
             prop_assert!(result.is_err());
         }
     }

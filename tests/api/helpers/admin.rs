@@ -42,8 +42,4 @@ impl TestApp {
             }
         }
     }
-
-    pub async fn send_subscribe_email(&self) -> Response {
-        self.send_get("v1/user/me/email/subscribe").await
-    }
 }

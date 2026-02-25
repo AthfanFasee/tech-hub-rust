@@ -26,7 +26,11 @@ impl TestApp {
     }
 
     pub async fn change_password(&self, payload: &Value) -> Response {
-        self.send_post("v1/user/me/reset-password", payload).await
+        self.send_post("v1/user/me/change-password", payload).await
+    }
+
+    pub async fn request_subscription_email(&self) -> Response {
+        self.send_get("v1/user/me/request-subscription").await
     }
 
     pub async fn access_protected(&self) -> Response {

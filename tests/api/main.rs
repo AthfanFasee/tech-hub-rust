@@ -1,11 +1,7 @@
-mod comment;
-mod get_all_posts;
+mod admin;
+mod comments;
 mod health_check;
 mod helpers;
 mod idempotency;
-mod login;
-mod news_letter;
-mod password_reset;
-mod post;
-mod user_register;
-mod user_subscribe;
+mod posts;
+mod users;

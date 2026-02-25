@@ -8,7 +8,7 @@
 	test test-full test-log test-log-debug test-single test-release \
 	migrate-add migrate migrate-new \
 	fuzz fuzz-single fuzz-domain fuzz-intensive fuzz-coverage fuzz-clean \
-	redis
+	redis redis-new
 
 
 
@@ -78,7 +78,7 @@ run-full: lint
 	cargo run | bunyan
 
 # Run from scratch: creates new containers, runs migrations, and starts the app
-run-scratch: migrate-new redis
+run-scratch: migrate-new redis-new
 	@echo "Running cargo run with bunyan formatted logs..."
 	cargo run | bunyan
 
@@ -96,8 +96,12 @@ test: lint
 # Test full command: starts existing containers and runs tests
 test-full: lint
 	@echo "Starting existing Postgres and Redis containers..."
-	@docker start techhub_postgres || echo "Postgres container not found. Run 'make run-scratch' instead."
-	@docker start techhub_redis || echo "Redis container not found. Run 'make run-scratch' instead."
+	@docker start techhub_postgres || echo "Postgres container not found. Run 'make test-scratch' instead."
+	@docker start techhub_redis || echo "Redis container not found. Run 'make test-scratch' instead."
+	@$(MAKE) test
+
+# Test scratch command: creates new containers and runs tests
+test-scratch: migrate-new redis-new
 	@$(MAKE) test
 
 # Test log command: performs check, format, then runs tests with bunyan logging
@@ -191,6 +195,24 @@ migrate-new:
 	./scripts/init_db.sh
 	@echo "Running cargo sqlx prepare..."
 	cargo sqlx prepare
+
+
+
+# ==================================================================================== #
+# REDIS
+# ==================================================================================== #
+
+# Redis command: launch redis container
+redis:
+	@echo "Launching redis container..."
+	./scripts/init_redis.sh
+
+# Redis new command: delete existing container and launch a new redis container
+redis-new:
+	@echo "Stopping and removing existing redis container..."
+	-docker rm -f techhub_redis || true
+	@echo "Launching a new redis container..."
+	./scripts/init_redis.sh
 
 
 
@@ -289,14 +311,3 @@ fuzz-clean: ensure-nightly
 	@rm -rf fuzz/artifacts/*
 	@rm -rf fuzz/corpus/*
 	@echo "Fuzzing data cleaned!"
-
-
-
-# ==================================================================================== #
-# REDIS
-# ==================================================================================== #
-
-# Redis command: launch a redis container
-redis:
-	@echo "Launching a new redis container..."
-	./scripts/init_redis.sh

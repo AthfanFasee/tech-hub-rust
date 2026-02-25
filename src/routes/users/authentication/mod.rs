@@ -1,7 +1,7 @@
+pub mod change_password;
 pub mod login;
-pub mod password_reset;
-pub mod user_register;
+pub mod register;
 
+pub use change_password::*;
 pub use login::*;
-pub use password_reset::*;
-pub use user_register::*;
+pub use register::*;

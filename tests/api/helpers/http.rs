@@ -84,7 +84,7 @@ impl TestApp {
             .mount_as_scoped(&self.email_server)
             .await;
 
-        self.send_subscribe_email().await;
+        self.request_subscription_email().await;
 
         // Stimulate that user will be clicking confirmation email outside our app by logging out
         self.logout().await;

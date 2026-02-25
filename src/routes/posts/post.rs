@@ -1,7 +1,7 @@
 use crate::authentication::{IsAdmin, UserId};
 use crate::domain::{
-    CreatePostPayload, CreatePostResponse, CreatedBy, Filters, GetAllPostsQuery, Img, Metadata,
-    Post, PostQuery, PostRecord, PostResponse, QueryTitle, SortDirection, Text, Title,
+    CreatePostPayload, CreatePostResponse, CreatedBy, Filters, GetAllPostsQuery, Metadata, Post,
+    PostImg, PostQuery, PostRecord, PostResponse, PostText, PostTitle, QueryTitle, SortDirection,
 };
 use crate::utils;
 use actix_web::ResponseError;
@@ -142,7 +142,7 @@ async fn fetch_posts_with_count(
         .bind(offset)
         .fetch_all(pool)
         .await
-        .context("Failed to fetch posts from database")?;
+        .context("Failed to fetch posts")?;
 
     let total_count = records.first().map(|r| r.total_count).unwrap_or(0);
 
@@ -179,7 +179,7 @@ async fn get_post_by_id(id: Uuid, pool: &PgPool) -> Result<PostResponse, PostErr
         .bind(id)
         .fetch_optional(pool)
         .await
-        .context("Failed to fetch posts from database")?;
+        .context("Failed to fetch posts")?;
 
     match record {
         Some(rec) => Ok(PostResponse::from(rec)),
@@ -221,9 +221,9 @@ pub async fn create_post(
     fields(post_id=tracing::field::Empty)
 )]
 pub async fn insert_post_and_return_inserted_data(
-    title: &Title,
-    text: &Text,
-    img: &Img,
+    title: &PostTitle,
+    text: &PostText,
+    img: &PostImg,
     created_by: UserId,
     pool: &PgPool,
 ) -> Result<(Uuid, DateTime<Utc>), anyhow::Error> {
@@ -241,7 +241,7 @@ pub async fn insert_post_and_return_inserted_data(
     )
     .fetch_one(pool)
     .await
-    .context("Failed to insert new posts into database")?;
+    .context("Failed to insert new posts")?;
     Span::current().record("post_id", tracing::field::display(&record.id));
     Ok((record.id, record.created_at))
 }
@@ -310,9 +310,9 @@ pub async fn update_post(
 #[tracing::instrument(skip_all, fields(post_id=%id))]
 async fn update_post_in_db(
     id: Uuid,
-    title: &Title,
-    text: &Text,
-    img: &Img,
+    title: &PostTitle,
+    text: &PostText,
+    img: &PostImg,
     version: i32,
     pool: &PgPool,
 ) -> Result<(), PostError> {

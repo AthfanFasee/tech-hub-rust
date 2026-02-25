@@ -3,7 +3,7 @@ use wiremock::matchers;
 use wiremock::{Mock, ResponseTemplate};
 
 #[tokio::test]
-async fn subscription_link_via_email_subscribes_a_user() {
+async fn subscribe_user_subscribes_user_with_emailed_token() {
     let app = helpers::spawn_app().await;
     app.login().await;
 
@@ -13,7 +13,7 @@ async fn subscription_link_via_email_subscribes_a_user() {
         .mount(&app.email_server)
         .await;
 
-    app.send_subscribe_email().await;
+    app.request_subscription_email().await;
 
     // Stimulate that user will be clicking confirmation email outside our app by logging out
     app.logout().await;
@@ -49,7 +49,7 @@ async fn subscription_link_via_email_subscribes_a_user() {
 async fn subscribe_user_returns_400_when_token_is_missing() {
     let app = helpers::spawn_app().await;
 
-    let response = reqwest::get(&format!("{}/v1/user/confirm/subscribe", app.address))
+    let response = reqwest::get(&format!("{}/v1/user/subscribe", app.address))
         .await
         .unwrap();
     assert_eq!(response.status().as_u16(), 400);
@@ -60,7 +60,7 @@ async fn subscribe_user_returns_401_for_invalid_token() {
     let app = helpers::spawn_app().await;
 
     let response = reqwest::get(&format!(
-        "{}/v1/user/confirm/subscribe?token=not-a-real-token",
+        "{}/v1/user/subscribe?token=not-a-real-token",
         app.address
     ))
     .await
@@ -79,7 +79,7 @@ async fn subscribe_user_deletes_subscription_token_after_successful_subscription
         .mount(&app.email_server)
         .await;
 
-    app.send_subscribe_email().await;
+    app.request_subscription_email().await;
 
     let email_request = &app.email_server.received_requests().await.unwrap()[0];
     let confirmation_links = app.get_confirmation_links(email_request);
@@ -98,7 +98,7 @@ async fn subscribe_user_deletes_subscription_token_after_successful_subscription
 }
 
 #[tokio::test]
-async fn send_subscribe_email_returns_500_if_email_sending_fails() {
+async fn request_subscription_returns_500_if_email_sending_fails() {
     let app = helpers::spawn_app().await;
     app.login().await;
 
@@ -108,6 +108,6 @@ async fn send_subscribe_email_returns_500_if_email_sending_fails() {
         .mount(&app.email_server)
         .await;
 
-    let response = app.send_subscribe_email().await;
+    let response = app.request_subscription_email().await;
     assert_eq!(response.status().as_u16(), 500);
 }

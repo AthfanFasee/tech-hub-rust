@@ -1,7 +1,7 @@
 use crate::authentication::UserId;
 use crate::domain::UserEmail;
 use crate::email_client::{EmailClient, EmailError};
-use crate::routes::users::authentication::user_register;
+use crate::routes::users::authentication::register;
 use crate::startup::ApplicationBaseUrl;
 use crate::utils;
 use actix_web::http::StatusCode;
@@ -14,12 +14,12 @@ use tracing::{Span, field};
 use uuid::Uuid;
 
 #[derive(serde::Deserialize)]
-pub struct SubscribeParameters {
+pub struct SubscribeUserParameters {
     token: String,
 }
 
 #[derive(thiserror::Error)]
-pub enum UserSubscribeError {
+pub enum SubscriptionError {
     #[error("{0}")]
     ValidationError(String),
 
@@ -30,18 +30,18 @@ pub enum UserSubscribeError {
     UnexpectedError(#[from] anyhow::Error),
 }
 
-impl Debug for UserSubscribeError {
+impl Debug for SubscriptionError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         utils::error_chain_fmt(self, f)
     }
 }
 
-impl ResponseError for UserSubscribeError {
+impl ResponseError for SubscriptionError {
     fn error_response(&self) -> HttpResponse {
         let status_code = match self {
-            UserSubscribeError::ValidationError(_) => StatusCode::BAD_REQUEST,
-            UserSubscribeError::UnknownToken => StatusCode::UNAUTHORIZED,
-            UserSubscribeError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            SubscriptionError::ValidationError(_) => StatusCode::BAD_REQUEST,
+            SubscriptionError::UnknownToken => StatusCode::UNAUTHORIZED,
+            SubscriptionError::UnexpectedError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
         utils::build_error_response(status_code, self.to_string())
@@ -53,13 +53,13 @@ impl ResponseError for UserSubscribeError {
     fields(user_id=tracing::field::Empty)
 )]
 pub async fn subscribe_user(
-    parameters: web::Query<SubscribeParameters>,
+    parameters: web::Query<SubscribeUserParameters>,
     pool: web::Data<PgPool>,
-) -> Result<HttpResponse, UserSubscribeError> {
-    let user_id = user_register::get_user_id_from_token(&pool, &parameters.token)
+) -> Result<HttpResponse, SubscriptionError> {
+    let user_id = register::get_user_id_from_token(&pool, &parameters.token)
         .await?
         // Domain error (invalid token), so a new `UserConfirmError::UnknownToken` error is created instead of wrapping an `anyhow::Error`
-        .ok_or(UserSubscribeError::UnknownToken)?;
+        .ok_or(SubscriptionError::UnknownToken)?;
     Span::current().record("user_id", field::display(user_id));
 
     subscribe_user_and_delete_token(&pool, user_id, &parameters.token).await?;
@@ -96,15 +96,15 @@ pub async fn subscribe_user_and_delete_token(
     skip_all,
     fields(user_id=%&*user_id)
 )]
-pub async fn send_subscribe_email(
+pub async fn request_subscription(
     email_client: web::Data<EmailClient>,
     base_url: web::Data<ApplicationBaseUrl>,
     pool: web::Data<PgPool>,
     user_id: web::ReqData<UserId>,
-) -> Result<HttpResponse, UserSubscribeError> {
+) -> Result<HttpResponse, SubscriptionError> {
     let user_id = user_id.into_inner();
     let user_email = get_user_email(*user_id, &pool).await?;
-    let email = UserEmail::parse(user_email).map_err(UserSubscribeError::ValidationError)?;
+    let email = UserEmail::parse(user_email).map_err(SubscriptionError::ValidationError)?;
 
     let activation_token = utils::generate_token();
 
@@ -127,7 +127,7 @@ pub async fn send_subscription_email(
     base_url: &str,
     token: &str,
 ) -> Result<(), EmailError> {
-    let confirmation_link = format!("{base_url}/v1/user/confirm/subscribe?token={token}");
+    let confirmation_link = format!("{base_url}/v1/user/subscribe?token={token}");
     let plain_body = format!(
         "Welcome to TechHub Newsletter!\nVisit {confirmation_link} to confirm your subscription to our newsletter.",
     );

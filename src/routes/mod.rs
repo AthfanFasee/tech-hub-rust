@@ -9,5 +9,5 @@ pub use admin::*;
 pub use comments::*;
 pub use health_check::*;
 pub use posts::*;
-pub use users::user_subscribe::*;
+pub use users::subscription::*;
 pub use users::*;

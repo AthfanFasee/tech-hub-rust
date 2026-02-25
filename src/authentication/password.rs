@@ -114,7 +114,7 @@ pub async fn change_password(
     )
     .execute(pool)
     .await
-    .context("Failed to change user's password in the database.")?;
+    .context("Failed to change user's password")?;
     Ok(())
 }
 

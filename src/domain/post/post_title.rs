@@ -3,9 +3,9 @@ use std::fmt::{Display, Formatter};
 use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Debug)]
-pub struct Title(String);
+pub struct PostTitle(String);
 
-impl Title {
+impl PostTitle {
     pub fn parse(s: String) -> Result<Self, String> {
         let trimmed = s.trim();
 
@@ -31,13 +31,13 @@ impl Title {
     }
 }
 
-impl AsRef<str> for Title {
+impl AsRef<str> for PostTitle {
     fn as_ref(&self) -> &str {
         &self.0
     }
 }
 
-impl Display for Title {
+impl Display for PostTitle {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }
@@ -45,45 +45,45 @@ impl Display for Title {
 
 #[cfg(test)]
 mod tests {
-    use super::Title;
+    use super::PostTitle;
     use claims::{assert_err, assert_ok};
     use proptest::prelude::*;
 
     // Example-based tests
     #[test]
     fn empty_title_is_rejected() {
-        let result = Title::parse("".into());
+        let result = PostTitle::parse("".into());
         assert_err!(result);
     }
 
     #[test]
     fn long_title_is_rejected() {
         let long_title = "a".repeat(101);
-        let result = Title::parse(long_title);
+        let result = PostTitle::parse(long_title);
         assert_err!(result);
     }
 
     #[test]
     fn title_with_only_numbers_is_rejected() {
-        let result = Title::parse("12345".into());
+        let result = PostTitle::parse("12345".into());
         assert_err!(result);
     }
 
     #[test]
     fn title_with_only_numbers_and_spaces_is_rejected() {
-        let result = Title::parse("123 456".into());
+        let result = PostTitle::parse("123 456".into());
         assert_err!(result);
     }
 
     #[test]
     fn title_with_numbers_and_letters_is_accepted() {
-        let result = Title::parse("Post123".into());
+        let result = PostTitle::parse("Post123".into());
         assert_ok!(result);
     }
 
     #[test]
     fn title_with_letters_and_numbers_is_accepted() {
-        let result = Title::parse("123Post".into());
+        let result = PostTitle::parse("123Post".into());
         assert_ok!(result);
     }
 
@@ -93,7 +93,7 @@ mod tests {
         fn valid_titles_with_valid_length_are_accepted(
             title in r"[a-zA-Z][a-zA-Z0-9 ]{0,99}",
         ) {
-            let result = Title::parse(title);
+            let result = PostTitle::parse(title);
             prop_assert!(result.is_ok());
         }
 
@@ -101,7 +101,7 @@ mod tests {
         fn titles_longer_than_100_chars_are_rejected(
             title in r"[a-zA-Z0-9]{101,150}",
         ) {
-            let result = Title::parse(title);
+            let result = PostTitle::parse(title);
             prop_assert!(result.is_err());
         }
 
@@ -109,7 +109,7 @@ mod tests {
         fn whitespace_only_titles_are_rejected(
             title in r"\s{1,50}",
         ) {
-            let result = Title::parse(title);
+            let result = PostTitle::parse(title);
             prop_assert!(result.is_err());
         }
 
@@ -117,7 +117,7 @@ mod tests {
         fn numeric_only_titles_are_rejected(
             title in r"[0-9]{1,50}",
         ) {
-            let result = Title::parse(title);
+            let result = PostTitle::parse(title);
             prop_assert!(result.is_err());
         }
 
@@ -127,7 +127,7 @@ mod tests {
             num2 in r"[0-9]{1,20}",
         ) {
             let title = format!("{} {}", num1, num2);
-            let result = Title::parse(title);
+            let result = PostTitle::parse(title);
             prop_assert!(result.is_err());
         }
     }
