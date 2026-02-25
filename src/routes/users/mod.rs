@@ -1,6 +1,6 @@
 mod authentication;
 mod routes;
-pub mod subscription;
+mod subscription;
 
 pub use authentication::*;
 pub use routes::*;

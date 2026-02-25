@@ -17,7 +17,7 @@ pub struct Newsletter {
 }
 
 impl Newsletter {
-    pub fn new(title: String, html: String, text: String) -> Result<Self, String> {
+    pub(super) fn new(title: String, html: String, text: String) -> Result<Self, String> {
         Ok(Self {
             title: NewsletterTitle::parse(title)?,
             content: NewsletterContent::new(html, text)?,

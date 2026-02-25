@@ -12,7 +12,7 @@ pub struct Comment {
 }
 
 impl Comment {
-    pub fn new(text: String, post_id: String) -> Result<Self, String> {
+    pub(super) fn new(text: String, post_id: String) -> Result<Self, String> {
         let post_id = Uuid::parse_str(&post_id)
             .map_err(|_| "Invalid post_id: must be a valid UUID".to_string())?;
 

@@ -13,7 +13,7 @@ use crate::{
     domain::{
         CreatePostPayload, CreatePostResponse, CreatedBy, Filters, GetAllPostsQuery, Metadata,
         Post, PostImg, PostQuery, PostRecord, PostResponse, PostText, PostTitle, QueryTitle,
-        SortDirection,
+        SortDirection, UpdatePostPayload,
     },
     utils,
 };
@@ -246,21 +246,6 @@ pub async fn insert_post_and_return_inserted_data(
     .context("Failed to insert new posts")?;
     Span::current().record("post_id", tracing::field::display(&record.id));
     Ok((record.id, record.created_at))
-}
-
-#[derive(Deserialize, Debug)]
-pub struct UpdatePostPayload {
-    pub title: String,
-    pub text: String,
-    pub img: String,
-}
-
-impl TryFrom<UpdatePostPayload> for Post {
-    type Error = String;
-
-    fn try_from(value: UpdatePostPayload) -> Result<Self, Self::Error> {
-        Post::new(value.title, value.text, value.img)
-    }
 }
 
 #[tracing::instrument(

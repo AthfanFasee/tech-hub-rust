@@ -73,3 +73,18 @@ impl TryFrom<CreatePostPayload> for Post {
         Ok(post)
     }
 }
+
+#[derive(Deserialize, Debug)]
+pub struct UpdatePostPayload {
+    pub title: String,
+    pub text: String,
+    pub img: String,
+}
+
+impl TryFrom<UpdatePostPayload> for Post {
+    type Error = String;
+
+    fn try_from(value: UpdatePostPayload) -> Result<Self, Self::Error> {
+        Post::new(value.title, value.text, value.img)
+    }
+}

@@ -15,7 +15,7 @@ pub struct NewUser {
 }
 
 impl NewUser {
-    pub fn new(email: String, user_name: String, password: String) -> Result<Self, String> {
+    pub(super) fn new(email: String, user_name: String, password: String) -> Result<Self, String> {
         Ok(Self {
             email: UserEmail::parse(email)?,
             user_name: UserName::parse(user_name)?,

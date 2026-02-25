@@ -18,7 +18,7 @@ pub struct Post {
 }
 
 impl Post {
-    pub fn new(title: String, text: String, img: String) -> Result<Self, String> {
+    pub(super) fn new(title: String, text: String, img: String) -> Result<Self, String> {
         Ok(Self {
             title: PostTitle::parse(title)?,
             text: PostText::parse(text)?,
