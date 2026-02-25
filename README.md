@@ -28,11 +28,9 @@ reliable, scalable operation.
 The application is structured around the domain logic, ensuring the core business rules are isolated and independent
 of external concerns like databases or web frameworks.
 
-* **Application Layer**: Handles I/O and orchestration (e.g., HTTP Handlers, Background Workers).
-
-* **Domain Layer**: Contains the core business logic (e.g., Entities, Value Objects, Business Rules).
-
-* **Infrastructure Layer**: Handles external dependencies (e.g., Database, Email, Cache).
+* Application Layer: Handles I/O and orchestration (e.g., HTTP Handlers, Background Workers).
+* Domain Layer: Contains the core business logic (e.g., Entities, Value Objects, Business Rules).
+* Infrastructure Layer: Handles external dependencies (e.g., Database, Email, Cache).
 
 ### **Domain-Driven Design (DDD) Principles**
 
