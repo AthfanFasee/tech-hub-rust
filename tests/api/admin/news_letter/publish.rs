@@ -1,9 +1,10 @@
-use crate::helpers;
 use std::time::Duration;
+
 use techhub::newsletter_delivery_worker;
 use uuid::Uuid;
-use wiremock::matchers;
-use wiremock::{Mock, ResponseTemplate};
+use wiremock::{Mock, ResponseTemplate, matchers};
+
+use crate::helpers;
 
 #[tokio::test]
 async fn publish_newsletter_does_not_deliver_to_inactivated_user() {

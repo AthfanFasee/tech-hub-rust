@@ -1,5 +1,4 @@
-use std::fmt;
-use std::fmt::{Display, Formatter};
+use std::fmt::{self, Display, Formatter};
 #[derive(Debug)]
 pub struct NewsletterText(String);
 
@@ -35,9 +34,10 @@ impl Display for NewsletterText {
 
 #[cfg(test)]
 mod tests {
-    use super::NewsletterText;
     use claims::{assert_err, assert_ok};
     use proptest::prelude::*;
+
+    use super::NewsletterText;
 
     // Example-based tests for Newsletter Text
     #[test]

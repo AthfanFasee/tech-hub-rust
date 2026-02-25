@@ -1,7 +1,8 @@
+use std::future::{Ready, ready};
+
 use actix_session::{Session, SessionExt};
 use actix_web::{FromRequest, HttpRequest, dev::Payload};
 use anyhow::Context;
-use std::future::{Ready, ready};
 use uuid::Uuid;
 
 pub struct TypedSession(Session);

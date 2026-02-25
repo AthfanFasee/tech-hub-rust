@@ -1,5 +1,6 @@
-use crate::helpers;
 use uuid::Uuid;
+
+use crate::helpers;
 
 #[tokio::test]
 async fn login_returns_success_for_valid_username_and_password() {

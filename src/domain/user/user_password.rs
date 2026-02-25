@@ -34,10 +34,11 @@ impl UserPassword {
 
 #[cfg(test)]
 mod tests {
-    use super::UserPassword;
     use claims::{assert_err, assert_ok};
     use proptest::prelude::*;
     use unicode_segmentation::UnicodeSegmentation;
+
+    use super::UserPassword;
 
     // Example-based tests
     #[test]

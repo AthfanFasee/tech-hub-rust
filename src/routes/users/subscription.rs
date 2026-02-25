@@ -1,17 +1,19 @@
-use crate::authentication::UserId;
-use crate::domain::UserEmail;
-use crate::email_client::{EmailClient, EmailError};
-use crate::routes::users::authentication::register;
-use crate::startup::ApplicationBaseUrl;
-use crate::utils;
-use actix_web::http::StatusCode;
-use actix_web::{HttpResponse, ResponseError, web};
+use std::fmt::{self, Debug, Formatter};
+
+use actix_web::{HttpResponse, ResponseError, http::StatusCode, web};
 use anyhow::Context;
 use sqlx::PgPool;
-use std::fmt;
-use std::fmt::{Debug, Formatter};
 use tracing::{Span, field};
 use uuid::Uuid;
+
+use crate::{
+    authentication::UserId,
+    domain::UserEmail,
+    email_client::{EmailClient, EmailError},
+    routes::users::authentication::register,
+    startup::ApplicationBaseUrl,
+    utils,
+};
 
 #[derive(serde::Deserialize)]
 pub struct SubscribeUserParameters {

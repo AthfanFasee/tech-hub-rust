@@ -1,17 +1,23 @@
-use crate::configuration::{Configuration, DatabaseConfigs};
-use crate::email_client::EmailClient;
-use crate::routes;
-use actix_session::SessionMiddleware;
-use actix_session::storage::RedisSessionStore;
-use actix_web::cookie::Key;
-use actix_web::dev::Server;
-use actix_web::{App, HttpServer, web, web::Data, web::ServiceConfig};
+use std::net::TcpListener;
+
+use actix_session::{SessionMiddleware, storage::RedisSessionStore};
+use actix_web::{
+    App, HttpServer,
+    cookie::Key,
+    dev::Server,
+    web,
+    web::{Data, ServiceConfig},
+};
 use anyhow::Context;
 use secrecy::{ExposeSecret, Secret};
-use sqlx::PgPool;
-use sqlx::postgres::PgPoolOptions;
-use std::net::TcpListener;
+use sqlx::{PgPool, postgres::PgPoolOptions};
 use tracing_actix_web::TracingLogger;
+
+use crate::{
+    configuration::{Configuration, DatabaseConfigs},
+    email_client::EmailClient,
+    routes,
+};
 
 pub struct Application {
     port: u16,

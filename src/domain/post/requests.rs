@@ -261,9 +261,10 @@ impl Metadata {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use claims::{assert_err, assert_ok};
     use proptest::prelude::*;
+
+    use super::*;
 
     // `QueryTitle` tests
     #[test]

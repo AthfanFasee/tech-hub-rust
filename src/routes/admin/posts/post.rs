@@ -1,8 +1,11 @@
-use crate::authentication::UserId;
-use crate::routes::{PostError, PostPathParams};
 use actix_web::{HttpResponse, web};
 use anyhow::Context;
 use sqlx::PgPool;
+
+use crate::{
+    authentication::UserId,
+    routes::{PostError, PostPathParams},
+};
 
 #[tracing::instrument(
     skip(pool),

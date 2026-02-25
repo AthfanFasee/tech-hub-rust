@@ -1,6 +1,7 @@
-use crate::helpers::TestApp;
 use reqwest::Response;
 use serde_json::Value;
+
+use crate::helpers::TestApp;
 
 impl TestApp {
     pub async fn register_user(&self, payload: &Value) -> Response {

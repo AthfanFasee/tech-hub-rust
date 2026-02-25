@@ -1,5 +1,6 @@
-use crate::helpers;
 use techhub::newsletter_delivery_worker;
+
+use crate::helpers;
 
 #[tokio::test]
 async fn cleanup_old_idempotency_records_deletes_records_older_than_48_hours() {

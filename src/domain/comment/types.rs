@@ -1,7 +1,8 @@
-use crate::domain::Comment;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+use crate::domain::Comment;
 
 #[derive(sqlx::FromRow)]
 pub struct CommentRecord {

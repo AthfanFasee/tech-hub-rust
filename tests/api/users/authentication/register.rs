@@ -1,7 +1,6 @@
-use crate::helpers;
-use crate::helpers::TestUser;
-use wiremock::matchers;
-use wiremock::{Mock, ResponseTemplate};
+use wiremock::{Mock, ResponseTemplate, matchers};
+
+use crate::{helpers, helpers::TestUser};
 
 #[tokio::test]
 async fn register_user_persists_new_user_and_returns_200_for_valid_data() {

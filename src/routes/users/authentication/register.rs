@@ -1,20 +1,19 @@
-use crate::authentication;
-use crate::domain::{NewUser, UserData, UserEmail, UserName, UserPassword};
-use crate::email_client::EmailClient;
-use crate::email_client::EmailError;
-use crate::startup::ApplicationBaseUrl;
-use crate::telemetry;
-use crate::utils;
-use actix_web::ResponseError;
-use actix_web::http::StatusCode;
-use actix_web::{HttpResponse, web};
+use std::fmt::{self, Debug, Formatter};
+
+use actix_web::{HttpResponse, ResponseError, http::StatusCode, web};
 use anyhow::Context;
 use secrecy::ExposeSecret;
 use sqlx::{Executor, PgPool, Postgres, Transaction};
-use std::fmt;
-use std::fmt::{Debug, Formatter};
 use tracing::{Span, field};
 use uuid::Uuid;
+
+use crate::{
+    authentication,
+    domain::{NewUser, UserData, UserEmail, UserName, UserPassword},
+    email_client::{EmailClient, EmailError},
+    startup::ApplicationBaseUrl,
+    telemetry, utils,
+};
 
 #[derive(thiserror::Error)]
 pub enum RegisterError {

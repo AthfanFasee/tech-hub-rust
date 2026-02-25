@@ -1,8 +1,7 @@
-use html5ever::driver;
-use html5ever::tendril::TendrilSink;
+use std::fmt::{self, Display, Formatter};
+
+use html5ever::{driver, tendril::TendrilSink};
 use markup5ever_rcdom::{Handle, NodeData, RcDom};
-use std::fmt;
-use std::fmt::{Display, Formatter};
 
 #[derive(Debug)]
 pub struct NewsletterHtml(String);
@@ -106,9 +105,10 @@ impl Display for NewsletterHtml {
 
 #[cfg(test)]
 mod tests {
-    use super::NewsletterHtml;
     use claims::{assert_err, assert_ok};
     use proptest::prelude::*;
+
+    use super::NewsletterHtml;
 
     // Example-based tests for Newsletter HTML
     #[test]

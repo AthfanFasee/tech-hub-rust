@@ -1,11 +1,13 @@
-use crate::telemetry;
 use anyhow::Context;
-use argon2::password_hash::SaltString;
-use argon2::{Algorithm, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier, Version};
-
+use argon2::{
+    Algorithm, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier, Version,
+    password_hash::SaltString,
+};
 use secrecy::{ExposeSecret, Secret};
 use sqlx::PgPool;
 use uuid::Uuid;
+
+use crate::telemetry;
 
 #[derive(thiserror::Error, Debug)]
 pub enum AuthError {

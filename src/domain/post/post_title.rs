@@ -1,5 +1,5 @@
-use std::fmt;
-use std::fmt::{Display, Formatter};
+use std::fmt::{self, Display, Formatter};
+
 use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Debug)]
@@ -45,9 +45,10 @@ impl Display for PostTitle {
 
 #[cfg(test)]
 mod tests {
-    use super::PostTitle;
     use claims::{assert_err, assert_ok};
     use proptest::prelude::*;
+
+    use super::PostTitle;
 
     // Example-based tests
     #[test]

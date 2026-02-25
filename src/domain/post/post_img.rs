@@ -1,5 +1,4 @@
-use std::fmt;
-use std::fmt::{Display, Formatter};
+use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug)]
 pub struct PostImg(String);
@@ -46,9 +45,10 @@ impl Display for PostImg {
 
 #[cfg(test)]
 mod tests {
-    use super::PostImg;
     use claims::assert_err;
     use proptest::prelude::*;
+
+    use super::PostImg;
 
     // Example-based tests
     #[test]

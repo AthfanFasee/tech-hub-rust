@@ -27,9 +27,10 @@ impl Newsletter {
 
 #[cfg(test)]
 mod tests {
-    use super::Newsletter;
     use claims::assert_ok;
     use proptest::prelude::*;
+
+    use super::Newsletter;
 
     #[test]
     fn valid_newsletter_with_all_fields_is_accepted() {

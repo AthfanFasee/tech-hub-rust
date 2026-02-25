@@ -1,13 +1,12 @@
-use crate::domain::UserEmail;
-use crate::email_client::EmailClient;
+use std::{env, time::Duration};
+
 use config::{Config, File};
 use secrecy::{ExposeSecret, Secret};
 use serde;
-use sqlx::postgres::PgConnectOptions;
-use sqlx::postgres::PgSslMode;
-use std::env;
-use std::time::Duration;
+use sqlx::postgres::{PgConnectOptions, PgSslMode};
 use url::Url;
+
+use crate::{domain::UserEmail, email_client::EmailClient};
 
 #[derive(serde::Deserialize, Clone)]
 pub struct EmailClientSettings {

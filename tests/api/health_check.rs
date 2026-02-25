@@ -1,5 +1,6 @@
-use crate::helpers;
 use reqwest::Client;
+
+use crate::helpers;
 
 #[tokio::test]
 async fn health_check_works() {

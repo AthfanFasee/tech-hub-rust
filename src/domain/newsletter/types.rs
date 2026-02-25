@@ -1,5 +1,6 @@
-use crate::domain::Newsletter;
 use serde::Deserialize;
+
+use crate::domain::Newsletter;
 
 #[derive(Deserialize, Debug)]
 pub struct NewsLetterData {

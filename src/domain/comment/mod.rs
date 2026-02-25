@@ -1,9 +1,8 @@
 mod comment_text;
 mod types;
 
-pub use types::*;
-
 pub use comment_text::CommentText;
+pub use types::*;
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -26,10 +25,11 @@ impl Comment {
 
 #[cfg(test)]
 mod tests {
-    use super::Comment;
     use claims::{assert_err, assert_ok};
     use proptest::prelude::*;
     use uuid::Uuid;
+
+    use super::Comment;
 
     // Example-based tests
     #[test]

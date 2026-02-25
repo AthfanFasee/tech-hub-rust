@@ -1,16 +1,17 @@
-use crate::authentication::UserId;
-use crate::domain::{NewsLetterData, Newsletter};
-use crate::idempotency;
-use crate::idempotency::{IdempotencyKey, NextAction};
-use crate::utils;
-use actix_web::http::StatusCode;
-use actix_web::{HttpRequest, HttpResponse, ResponseError, web};
+use std::fmt::{self, Debug, Formatter};
+
+use actix_web::{HttpRequest, HttpResponse, ResponseError, http::StatusCode, web};
 use anyhow::Context;
-use sqlx::{Executor, PgPool};
-use sqlx::{Postgres, Transaction};
-use std::fmt;
-use std::fmt::{Debug, Formatter};
+use sqlx::{Executor, PgPool, Postgres, Transaction};
 use uuid::Uuid;
+
+use crate::{
+    authentication::UserId,
+    domain::{NewsLetterData, Newsletter},
+    idempotency,
+    idempotency::{IdempotencyKey, NextAction},
+    utils,
+};
 
 #[derive(thiserror::Error)]
 pub enum PublishError {

@@ -26,9 +26,10 @@ impl NewUser {
 
 #[cfg(test)]
 mod tests {
-    use super::NewUser;
     use claims::assert_ok;
     use proptest::prelude::*;
+
+    use super::NewUser;
 
     #[test]
     fn valid_user_is_accepted() {

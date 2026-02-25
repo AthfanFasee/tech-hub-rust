@@ -1,10 +1,10 @@
-use crate::helpers::{ConfirmationLinks, TestApp, TestUser};
 use linkify::{LinkFinder, LinkKind};
 use reqwest::{Response, Url, header::HeaderMap};
 use serde_json::Value;
 use uuid::Uuid;
-use wiremock::matchers;
-use wiremock::{Mock, Request, ResponseTemplate};
+use wiremock::{Mock, Request, ResponseTemplate, matchers};
+
+use crate::helpers::{ConfirmationLinks, TestApp, TestUser};
 
 impl TestApp {
     pub fn get_confirmation_links(&self, email_request: &Request) -> ConfirmationLinks {

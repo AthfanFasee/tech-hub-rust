@@ -1,6 +1,6 @@
 use std::io::{self, Write};
-use tokio::task;
-use tokio::task::JoinHandle;
+
+use tokio::{task, task::JoinHandle};
 use tracing::{Span, Subscriber, subscriber};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_log::LogTracer;

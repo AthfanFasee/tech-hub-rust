@@ -1,16 +1,18 @@
-use crate::authentication;
-use crate::authentication::{AuthError, Credentials};
-use crate::domain::LoginData;
-use crate::session_state::TypedSession;
-use crate::utils;
-use actix_web::http::StatusCode;
-use actix_web::{HttpResponse, ResponseError, web};
+use std::fmt::{self, Debug, Formatter};
+
+use actix_web::{HttpResponse, ResponseError, http::StatusCode, web};
 use anyhow::Context;
 use sqlx::PgPool;
-use std::fmt;
-use std::fmt::{Debug, Formatter};
 use tracing::Span;
 use uuid::Uuid;
+
+use crate::{
+    authentication,
+    authentication::{AuthError, Credentials},
+    domain::LoginData,
+    session_state::TypedSession,
+    utils,
+};
 
 #[derive(thiserror::Error)]
 pub enum LoginError {

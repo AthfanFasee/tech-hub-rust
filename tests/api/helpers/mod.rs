@@ -4,19 +4,16 @@ mod http;
 mod post;
 mod user;
 
-use argon2::password_hash::SaltString;
-use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version};
+use std::{env, io, sync::OnceLock};
+
+use argon2::{Algorithm, Argon2, Params, PasswordHasher, Version, password_hash::SaltString};
 use reqwest::{Client, Url};
 use secrecy::Secret;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
-use std::sync::OnceLock;
-use std::{env, io};
-use techhub::configuration;
-use techhub::configuration::DatabaseConfigs;
-use techhub::email_client::EmailClient;
-use techhub::startup;
-use techhub::startup::Application;
-use techhub::telemetry;
+use techhub::{
+    configuration, configuration::DatabaseConfigs, email_client::EmailClient, startup,
+    startup::Application, telemetry,
+};
 use uuid::Uuid;
 use wiremock::MockServer;
 

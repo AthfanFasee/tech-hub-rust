@@ -1,5 +1,6 @@
-use crate::helpers;
 use uuid::Uuid;
+
+use crate::helpers;
 
 #[tokio::test]
 async fn change_password_returns_401_for_unauthenticated_users() {

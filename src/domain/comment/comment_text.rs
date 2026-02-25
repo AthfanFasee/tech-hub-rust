@@ -1,5 +1,5 @@
-use std::fmt;
-use std::fmt::{Display, Formatter};
+use std::fmt::{self, Display, Formatter};
+
 use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Debug)]
@@ -37,10 +37,11 @@ impl Display for CommentText {
 
 #[cfg(test)]
 mod tests {
-    use super::CommentText;
     use claims::{assert_err, assert_ok};
     use proptest::prelude::*;
     use unicode_segmentation::UnicodeSegmentation;
+
+    use super::CommentText;
 
     // Example-based tests
     #[test]

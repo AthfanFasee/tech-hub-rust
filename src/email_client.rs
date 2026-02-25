@@ -1,7 +1,9 @@
-use crate::domain::UserEmail;
+use std::time::Duration;
+
 use reqwest::{Client, Url};
 use secrecy::{ExposeSecret, Secret};
-use std::time::Duration;
+
+use crate::domain::UserEmail;
 
 #[derive(Debug)]
 pub struct EmailClient {
@@ -80,18 +82,19 @@ impl EmailClient {
 
 #[cfg(test)]
 mod tests {
-    use crate::domain::UserEmail;
-    use crate::email_client::EmailClient;
+    use std::time::Duration;
+
     use claims::{assert_err, assert_ok};
-    use fake::faker::internet;
-    use fake::faker::lorem;
-    use fake::{Fake, Faker};
+    use fake::{
+        Fake, Faker,
+        faker::{internet, lorem},
+    };
     use reqwest::Url;
     use secrecy::Secret;
     use serde_json::Value;
-    use std::time::Duration;
-    use wiremock::matchers;
-    use wiremock::{Match, Mock, MockServer, Request, ResponseTemplate};
+    use wiremock::{Match, Mock, MockServer, Request, ResponseTemplate, matchers};
+
+    use crate::{domain::UserEmail, email_client::EmailClient};
 
     struct SendEmailBodyMatcher;
 

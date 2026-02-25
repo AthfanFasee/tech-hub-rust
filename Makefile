@@ -1,14 +1,118 @@
 # ==================================================================================== #
+# IMPORTANT: NIGHTLY TOOLCHAIN REQUIRED
+# ==================================================================================== #
+# Most commands in this Makefile depend on the Rust nightly toolchain for:
+#   - Advanced formatting features (import merging via rustfmt)
+#   - Fuzzing capabilities (cargo-fuzz requires nightly)
+#   - Commands that depend on nightly: lint-nightly, all test targets, all run targets,
+#     all fuzz targets (fuzz, fuzz-single, fuzz-domain, fuzz-intensive, fuzz-coverage)
+#
+# To install nightly, run:
+#   make install-nightly
+#
+# Or manually:
+#   rustup toolchain install nightly
+#   rustup component add rustfmt --toolchain nightly
+# ==================================================================================== #
+
+
+
+# ==================================================================================== #
 # PHONY DECLARATIONS
 # ==================================================================================== #
 
 .PHONY: \
-	lint security-audit audit security-audit-full audit-full \
+	install-nightly ensure-nightly help \
+	lint lint-nightly security-audit audit security-audit-full audit-full \
 	run run-full run-scratch \
-	test test-full test-log test-log-debug test-single test-release \
+	test test-full test-scratch test-log test-log-debug test-single test-release \
+	unit-test-stress-quick unit-test-stress-standard unit-test-stress-thorough unit-test-stress-log \
 	migrate-add migrate migrate-new \
-	fuzz fuzz-single fuzz-domain fuzz-intensive fuzz-coverage fuzz-clean \
+	fuzz fuzz-single fuzz-domain fuzz-intensive fuzz-coverage fuzz-clean init-fuzz-corpus \
 	redis redis-new
+
+
+
+# ==================================================================================== #
+# SETUP
+# ==================================================================================== #
+
+# Ensure nightly exists (installs if missing)
+ensure-nightly:
+	@rustup toolchain list | grep nightly > /dev/null || \
+		(echo "Nightly toolchain not found. Installing now..." && rustup toolchain install nightly) || \
+		(echo "ERROR: Failed to install nightly. Run 'make install-nightly' or install manually." && exit 1)
+	@rustup component list --toolchain nightly | grep "rustfmt.*installed" > /dev/null || \
+		rustup component add rustfmt --toolchain nightly
+
+# Install nightly toolchain: installs Rust nightly and rustfmt component
+install-nightly:
+	@echo "Installing Rust nightly toolchain..."
+	rustup toolchain install nightly
+	@echo "Adding rustfmt component to nightly..."
+	rustup component add rustfmt --toolchain nightly
+	@echo "Nightly toolchain installed successfully!"
+	@echo ""
+	@echo "You can now use 'make lint-nightly' and other commands that require nightly."
+
+# Help command: displays available commands and setup info
+help:
+	@echo "=========================================="
+	@echo "TechHub Makefile - Available Commands"
+	@echo "=========================================="
+	@echo ""
+	@echo "SETUP (First Time):"
+	@echo "  make install-nightly       Install Rust nightly toolchain (required)"
+	@echo ""
+	@echo "QUALITY CONTROL:"
+	@echo "  make lint                  Format code (stable rustfmt)"
+	@echo "  make lint-nightly          Format code + merge imports (nightly)"
+	@echo "  make security-audit        Check for vulnerabilities"
+	@echo "  make audit                 Security audit + tests"
+	@echo "  make audit-full            Security audit + tests + fuzzing (~15min)"
+	@echo ""
+	@echo "RUN:"
+	@echo "  make run                   Lint + run app (uses existing containers)"
+	@echo "  make run-full              Start containers + run app"
+	@echo "  make run-scratch           Fresh containers + migrations + run"
+	@echo ""
+	@echo "TEST:"
+	@echo "  make test                  Run all tests"
+	@echo "  make test-full             Start containers + run tests"
+	@echo "  make test-scratch          Fresh containers + run tests"
+	@echo "  make test-log              Run tests with bunyan logs"
+	@echo "  make test-single name=X    Run specific test with logs"
+	@echo "  make test-release          Run tests in release mode"
+	@echo ""
+	@echo "STRESS TEST:"
+	@echo "  make unit-test-stress-quick      Run unit tests 10x"
+	@echo "  make unit-test-stress-standard   Run unit tests 20x"
+	@echo "  make unit-test-stress-thorough   Run unit tests 50x"
+	@echo ""
+	@echo "DATABASE:"
+	@echo "  make migrate               Run migrations (skip docker)"
+	@echo "  make migrate-new           Fresh Postgres container + migrations"
+	@echo "  make migrate-add name=X    Create new migration file"
+	@echo ""
+	@echo "REDIS:"
+	@echo "  make redis                 Launch Redis container"
+	@echo "  make redis-new             Fresh Redis container"
+	@echo ""
+	@echo "FUZZING:"
+	@echo "  make fuzz                  Run all fuzzers (~10min)"
+	@echo "  make fuzz-single name=X    Run specific fuzzer (default 60s)"
+	@echo "  make fuzz-domain name=X    Run all fuzzers for domain"
+	@echo "  make fuzz-intensive        Extended fuzzing (~40min)"
+	@echo "  make fuzz-coverage name=X  Generate coverage report"
+	@echo "  make fuzz-clean            Clean fuzz artifacts"
+	@echo ""
+	@echo "TIPS:"
+	@echo "  - Most commands use 'lint-nightly' automatically"
+	@echo "  - Run 'make install-nightly' once before first use"
+	@echo "  - See Makefile comments for more details"
+	@echo "=========================================="
+
+.DEFAULT_GOAL := help
 
 
 
@@ -22,6 +126,15 @@ lint:
 	@cargo update
 	@echo "Running cargo fmt..."
 	cargo fmt
+	@echo "Running cargo check..."
+	cargo check
+
+# Lint nightly command: runs cargo update, nightly formatting (with import merging) and checking
+lint-nightly: ensure-nightly
+	@echo "Updating dependencies to latest compatible versions..."
+	@cargo update
+	@echo "Running cargo fmt with nightly (for import merging)..."
+	cargo +nightly fmt -- --config-path rustfmt-nightly.toml
 	@echo "Running cargo check..."
 	cargo check
 
@@ -65,12 +178,12 @@ audit-full: security-audit-full
 # ==================================================================================== #
 
 # Run command: performs check, format, and run in sequence
-run: lint
+run: lint-nightly
 	@echo "Running cargo run with with bunyan formatted logs..."
 	cargo run | bunyan
 
 # Run full command: starts existing containers and runs the app
-run-full: lint
+run-full: lint-nightly
 	@echo "Starting existing Postgres and Redis containers..."
 	@docker start techhub_postgres || echo "Postgres container not found. Run 'make run-scratch' instead."
 	@docker start techhub_redis || echo "Redis container not found. Run 'make run-scratch' instead."
@@ -89,15 +202,15 @@ run-scratch: migrate-new redis-new
 # ==================================================================================== #
 
 # Test command: performs check, format, and test (skips doc-tests)
-test: lint
+test: lint-nightly
 	@echo "Running cargo test (skipping doc-tests)"
 	@unset RUST_LOG && unset TEST_LOG && cargo test --all-targets
 
 # Test full command: starts existing containers and runs tests
-test-full: lint
+test-full: lint-nightly
 	@echo "Starting existing Postgres and Redis containers..."
-	@docker start techhub_postgres || echo "Postgres container not found. Run 'make test-scratch' instead."
-	@docker start techhub_redis || echo "Redis container not found. Run 'make test-scratch' instead."
+	@docker start techhub_postgres || echo "Postgres container not found. Run 'make run-scratch' instead."
+	@docker start techhub_redis || echo "Redis container not found. Run 'make run-scratch' instead."
 	@$(MAKE) test
 
 # Test scratch command: creates new containers and runs tests
@@ -105,18 +218,18 @@ test-scratch: migrate-new redis-new
 	@$(MAKE) test
 
 # Test log command: performs check, format, then runs tests with bunyan logging
-test-log: lint
+test-log: lint-nightly
 	@echo "Running cargo test with bunyan formatted logs..."
 	@export RUST_LOG="sqlx=error,info,error" && export TEST_LOG=true && cargo test --all-targets | bunyan
 
 # Test log debug command: performs check, format, then runs tests with bunyan logging
-test-log-debug: lint
+test-log-debug: lint-nightly
 	@echo "Running cargo test with bunyan formatted logs in debug mode..."
 	@export RUST_LOG="debug" && export TEST_LOG=true && cargo test --all-targets | bunyan
 
 # Test single command: performs check, format, then runs tests with bunyan logging
 # Usage: make test-single name=your_test_name
-test-single: lint
+test-single: lint-nightly
 	@if [ -z "$(name)" ]; then \
 		echo "Error: please provide a test name, e.g.:"; \
 		echo "   make test-single name=logout_clears_session_state"; \
@@ -126,13 +239,13 @@ test-single: lint
 	@export RUST_LOG="sqlx=error,debug" && export TEST_LOG=true && cargo test --all-targets $(name) -- --nocapture | bunyan
 
 # Test release command: runs tests in release mode
-test-release: lint
+test-release: lint-nightly
 	@echo "Running cargo test in release mode (skipping doc-tests)"
 	@unset RUST_LOG && unset TEST_LOG && cargo test --release --all-targets
 	@echo "Release mode test completed!"
 
 # Test stress command: runs only unit tests multiple times for property-based testing
-unit-test-stress-quick: lint
+unit-test-stress-quick: lint-nightly
 	@echo "Running unit tests 10 times for quick property-based testing..."
 	@for i in $$(seq 1 10); do \
 		echo "=== Unit test run $$i/10 ==="; \
@@ -140,7 +253,7 @@ unit-test-stress-quick: lint
 	done
 	@echo "Quick stress test completed! All 10 runs passed."
 
-unit-test-stress-standard: lint
+unit-test-stress-standard: lint-nightly
 	@echo "Running unit tests 20 times for thorough property-based testing..."
 	@for i in $$(seq 1 20); do \
 		echo "=== Unit test run $$i/20 ==="; \
@@ -148,7 +261,7 @@ unit-test-stress-standard: lint
 	done
 	@echo "Standard stress test completed! All 20 runs passed."
 
-unit-test-stress-thorough: lint
+unit-test-stress-thorough: lint-nightly
 	@echo "Running unit tests 50 times for exhaustive property-based testing..."
 	@for i in $$(seq 1 50); do \
 		echo "=== Unit test run $$i/50 ==="; \
@@ -157,7 +270,7 @@ unit-test-stress-thorough: lint
 	@echo "Thorough stress test completed! All 50 runs passed."
 
 # Test stress with logging command: runs unit tests 10 times with bunyan logging
-unit-test-stress-log: lint
+unit-test-stress-log: lint-nightly
 	@echo "Running unit tests 10 times with bunyan logging..."
 	@for i in $$(seq 1 10); do \
 		echo "=== Unit test run $$i/10 ==="; \
@@ -219,10 +332,6 @@ redis-new:
 # ==================================================================================== #
 # FUZZING
 # ==================================================================================== #
-
-# Ensure nightly exists (silent if already installed)
-ensure-nightly:
-	@rustup toolchain list | grep nightly > /dev/null || rustup toolchain install nightly
 
 # Initialize corpus: runs the corpus setup script (this ensures the corpus files are created)
 # Usage: make init-fuzz-corpus

@@ -1,5 +1,5 @@
-use std::fmt;
-use std::fmt::{Display, Formatter};
+use std::fmt::{self, Display, Formatter};
+
 use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Debug)]
@@ -47,9 +47,10 @@ impl Display for NewsletterTitle {
 
 #[cfg(test)]
 mod tests {
-    use super::NewsletterTitle;
     use claims::{assert_err, assert_ok};
     use proptest::prelude::*;
+
+    use super::NewsletterTitle;
 
     // Example-based tests for Newsletter Title
     #[test]

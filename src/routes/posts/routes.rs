@@ -1,7 +1,6 @@
-use crate::authentication;
-use crate::routes;
-use actix_web::middleware;
-use actix_web::web;
+use actix_web::{middleware, web};
+
+use crate::{authentication, routes};
 
 pub fn post_routes(cfg: &mut web::ServiceConfig) {
     cfg

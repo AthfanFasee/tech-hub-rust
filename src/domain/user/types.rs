@@ -1,7 +1,10 @@
-use crate::authentication::Credentials;
-use crate::domain::{NewUser, UserName, UserPassword};
 use secrecy::{ExposeSecret, Secret};
 use serde::Deserialize;
+
+use crate::{
+    authentication::Credentials,
+    domain::{NewUser, UserName, UserPassword},
+};
 
 #[derive(serde::Deserialize)]
 pub struct LoginData {

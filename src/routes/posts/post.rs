@@ -1,20 +1,22 @@
-use crate::authentication::{IsAdmin, UserId};
-use crate::domain::{
-    CreatePostPayload, CreatePostResponse, CreatedBy, Filters, GetAllPostsQuery, Metadata, Post,
-    PostImg, PostQuery, PostRecord, PostResponse, PostText, PostTitle, QueryTitle, SortDirection,
-};
-use crate::utils;
-use actix_web::ResponseError;
-use actix_web::http::StatusCode;
-use actix_web::{HttpResponse, web};
+use std::fmt::{self, Debug, Formatter};
+
+use actix_web::{HttpResponse, ResponseError, http::StatusCode, web};
 use anyhow::Context;
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use sqlx::PgPool;
-use std::fmt;
-use std::fmt::{Debug, Formatter};
 use tracing::Span;
 use uuid::Uuid;
+
+use crate::{
+    authentication::{IsAdmin, UserId},
+    domain::{
+        CreatePostPayload, CreatePostResponse, CreatedBy, Filters, GetAllPostsQuery, Metadata,
+        Post, PostImg, PostQuery, PostRecord, PostResponse, PostText, PostTitle, QueryTitle,
+        SortDirection,
+    },
+    utils,
+};
 
 #[derive(thiserror::Error)]
 pub enum PostError {

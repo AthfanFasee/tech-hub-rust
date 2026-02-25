@@ -1,9 +1,8 @@
-use super::IdempotencyKey;
-use actix_web::HttpResponse;
-use actix_web::body;
-use actix_web::http::StatusCode;
+use actix_web::{HttpResponse, body, http::StatusCode};
 use sqlx::{Executor, PgPool, Postgres, Transaction};
 use uuid::Uuid;
+
+use super::IdempotencyKey;
 
 #[derive(Debug, sqlx::Type)]
 #[sqlx(type_name = "header_pair")]

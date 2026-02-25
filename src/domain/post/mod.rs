@@ -29,9 +29,10 @@ impl Post {
 
 #[cfg(test)]
 mod tests {
-    use super::Post;
     use claims::assert_ok;
     use proptest::prelude::*;
+
+    use super::Post;
 
     #[test]
     fn valid_post_is_accepted() {

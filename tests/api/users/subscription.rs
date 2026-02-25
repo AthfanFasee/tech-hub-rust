@@ -1,6 +1,6 @@
+use wiremock::{Mock, ResponseTemplate, matchers};
+
 use crate::helpers;
-use wiremock::matchers;
-use wiremock::{Mock, ResponseTemplate};
 
 #[tokio::test]
 async fn subscribe_user_subscribes_user_with_emailed_token() {

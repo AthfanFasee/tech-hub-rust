@@ -1,7 +1,8 @@
-use crate::domain::Post;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+use crate::domain::Post;
 
 #[derive(sqlx::FromRow)]
 pub struct PostRecord {

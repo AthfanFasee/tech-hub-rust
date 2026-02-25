@@ -1,8 +1,8 @@
-use crate::helpers::TestApp;
 use reqwest::{Response, header::HeaderMap};
 use serde_json::Value;
-use techhub::newsletter_delivery_worker;
-use techhub::newsletter_delivery_worker::ExecutionOutcome;
+use techhub::{newsletter_delivery_worker, newsletter_delivery_worker::ExecutionOutcome};
+
+use crate::helpers::TestApp;
 
 impl TestApp {
     pub async fn login_admin(&self) {

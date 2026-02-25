@@ -1,5 +1,4 @@
-use std::fmt;
-use std::fmt::{Display, Formatter};
+use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug)]
 pub struct PostText(String);
@@ -34,9 +33,10 @@ impl Display for PostText {
 
 #[cfg(test)]
 mod tests {
-    use super::PostText;
     use claims::{assert_err, assert_ok};
     use proptest::prelude::*;
+
+    use super::PostText;
 
     // Example-based tests
     #[test]

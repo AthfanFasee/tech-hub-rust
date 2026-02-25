@@ -1,5 +1,5 @@
-use std::fmt;
-use std::fmt::{Display, Formatter};
+use std::fmt::{self, Display, Formatter};
+
 use validator::ValidateEmail;
 
 #[derive(Debug)]
@@ -48,13 +48,12 @@ impl Display for UserEmail {
 
 #[cfg(test)]
 mod tests {
-    use super::UserEmail;
     use claims::assert_err;
-    use fake::Fake;
-    use fake::faker::internet::en::SafeEmail;
+    use fake::{Fake, faker::internet::en::SafeEmail};
     use proptest::prelude::*;
-    use rand::SeedableRng;
-    use rand::rngs::StdRng;
+    use rand::{SeedableRng, rngs::StdRng};
+
+    use super::UserEmail;
 
     // Example-based tests for specific edge cases
     #[test]

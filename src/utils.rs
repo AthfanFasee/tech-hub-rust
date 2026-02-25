@@ -1,7 +1,11 @@
+use std::{
+    fmt,
+    fmt::{Debug, Display, Formatter},
+    iter,
+};
+
 use actix_web::{HttpResponse, error, http::StatusCode};
 use rand::{Rng, distributions::Alphanumeric};
-use std::fmt::{Debug, Display, Formatter};
-use std::{fmt, iter};
 
 #[derive(serde::Serialize)]
 pub struct ErrorResponse {

@@ -1,16 +1,13 @@
-use crate::configuration::Configuration;
-use crate::domain::UserEmail;
-use crate::email_client::EmailClient;
-use crate::startup;
-use anyhow::Context;
-use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
-use sqlx::{Executor, PgPool, Postgres, Transaction};
 use std::ops::DerefMut;
-use tokio::time;
-use tokio::time::Duration;
+
+use anyhow::Context;
+use rand::{Rng, SeedableRng, rngs::StdRng};
+use sqlx::{Executor, PgPool, Postgres, Transaction};
+use tokio::{time, time::Duration};
 use tracing::{Span, field};
 use uuid::Uuid;
+
+use crate::{configuration::Configuration, domain::UserEmail, email_client::EmailClient, startup};
 
 pub enum ExecutionOutcome {
     TaskCompleted,
