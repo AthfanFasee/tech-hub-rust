@@ -25,20 +25,20 @@ reliable, scalable operation.
 
 ### **Hexagonal Architecture (Ports and Adapters)**
 
-The application is structured around the **domain logic**, ensuring the core business rules are isolated and independent
+The application is structured around the domain logic, ensuring the core business rules are isolated and independent
 of external concerns like databases or web frameworks.
 
-* **Application Layer**: Handles I/O and orchestration (e.g., **HTTP Handlers**, **Background Workers**).
+* **Application Layer**: Handles I/O and orchestration (e.g., HTTP Handlers, Background Workers).
 
-* **Domain Layer**: Contains the core business logic (e.g., **Entities**, **Value Objects**, **Business Rules**).
+* **Domain Layer**: Contains the core business logic (e.g., Entities, Value Objects, Business Rules).
 
-* **Infrastructure Layer**: Handles external dependencies (e.g., **Database**, **Email**, **Cache**).
+* **Infrastructure Layer**: Handles external dependencies (e.g., Database, Email, Cache).
 
 ### **Domain-Driven Design (DDD) Principles**
 
-* **Compile-time validation** using **Rust's type system** ensures data integrity early.
-* **Aggregate roots** enforce **consistency boundaries** for transactional operations.
-* **Value objects** are used for explicit and reusable validation (e.g., for **email**, **username**, **password**).
+* Compile-time validation using Rust's type system ensures data integrity early.
+* Aggregate roots enforce consistency boundaries for transactional operations.
+* Value objects are used for explicit and reusable validation (e.g., for email, username, password).
 
 ---
 
