@@ -15,13 +15,13 @@ Delivers full-fledged telemetry with tracing spans, performance metrics, and err
 abstraction. Deployed using multi-stage Docker builds on AWS ECS with RDS and ElastiCache (Redis) for
 reliable, scalable operation.
 
-## 🛠 Core Technologies & Skills
+## Core Technologies & Skills
 
 * **Languages & Frameworks**: Rust, Actix Web, Bash
 * **Database & Cache**: PostgreSQL, Redis
 * **DevOps & Cloud**: Docker, Amazon Web Services (AWS)
 
-## 🏗 Architecture & Design
+## Architecture & Design
 
 ### **Hexagonal Architecture (Ports and Adapters)**
 
@@ -42,7 +42,7 @@ of external concerns like databases or web frameworks.
 
 ---
 
-## 📦 Quick Start
+## Quick Start
 
 ### Prerequisites
 
