@@ -320,7 +320,7 @@ unit-test-stress-log: lint-nightly
 
 # Test command: lint then run all tests via nextest
 test-nx: lint-nightly ensure-nextest
-	@echo "Running tests via nextest (skipping doc-tests)..."
+	@echo "Running tests via nextest..."
 	@unset RUST_LOG && unset TEST_LOG && cargo nextest run
 
 # Test full command: start existing containers then run nextest
