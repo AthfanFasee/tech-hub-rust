@@ -42,7 +42,7 @@ impl EmailClient {
         let http_client = Client::builder()
             .timeout(timeout)
             .build()
-            // Safe to unwrap as builder only fails on invalid TLS/config, not a simple timeout setup
+            // Safe to use `expect` as builder only fails on invalid TLS/config, not a simple timeout setup
             .expect("Reqwest HTTP client with a simple timeout should always build successfully");
 
         Self {

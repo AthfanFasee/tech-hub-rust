@@ -1,10 +1,10 @@
 use std::ops::DerefMut;
 
 use anyhow::Context;
-use rand::{rngs::StdRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use sqlx::{Executor, PgPool, Postgres, Transaction};
 use tokio::{time, time::Duration};
-use tracing::{field, Span};
+use tracing::{Span, field};
 use uuid::Uuid;
 
 use crate::{configuration::Configuration, domain::UserEmail, email_client::EmailClient, startup};
@@ -96,7 +96,7 @@ pub async fn try_execute_task(
         return Ok(ExecutionOutcome::EmptyQueue);
     }
 
-    // Safe to unwrap here as None case is handled by the early return above
+    // Safe to use `expect` here as None case is handled by the early return above
     let (mut transaction, issue_id, email, n_retries) =
         maybe_task.expect("maybe_task should always be Some after passing the is_none() guard");
 
@@ -210,9 +210,9 @@ async fn dequeue_task(
         LIMIT 1
         "#
     )
-        .fetch_optional(transaction.deref_mut())
-        .await
-        .context("Failed dequeue a newsletter issue task from db")?;
+    .fetch_optional(transaction.deref_mut())
+    .await
+    .context("Failed dequeue a newsletter issue task from db")?;
 
     if let Some(r) = r {
         Ok(Some((
@@ -315,9 +315,9 @@ async fn get_newsletter_issue(
         "#,
         issue_id
     )
-        .fetch_one(&mut **transaction)
-        .await
-        .context("Failed to get newsletter issue details")?;
+    .fetch_one(&mut **transaction)
+    .await
+    .context("Failed to get newsletter issue details")?;
 
     Ok(issue)
 }
@@ -342,9 +342,9 @@ pub async fn cleanup_old_newsletter_issues(pool: &PgPool) -> Result<(), anyhow::
         WHERE created_at < NOW() - INTERVAL '7 days'
         "#,
     )
-        .execute(pool)
-        .await?
-        .rows_affected();
+    .execute(pool)
+    .await?
+    .rows_affected();
 
     tracing::info!(deleted, "Old newsletter issues cleanup completed");
     Ok(())

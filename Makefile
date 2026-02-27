@@ -4,8 +4,7 @@
 # Most commands in this Makefile depend on the Rust nightly toolchain for:
 #   - Advanced formatting features (import merging via rustfmt)
 #   - Fuzzing capabilities (cargo-fuzz requires nightly)
-#   - Commands that depend on nightly: lint-nightly, all test targets, all run targets,
-#     all fuzz targets (fuzz, fuzz-single, fuzz-domain, fuzz-intensive, fuzz-coverage)
+#   - Commands that depend on nightly: lint-nightly, all test targets, all run targets, all fuzz targets
 #
 # To install nightly, run:
 #   make install-nightly
@@ -207,7 +206,7 @@ audit-full: security-audit-full
 
 # Deployment ready check: full security audit + release tests + license/source verification
 # Ensures the codebase is clean, secure, and production-ready before deploying
-deployment-check: security-audit test-nx-release
+deployment-check: security-audit test-release
 	@echo ""
 	@echo "=========================================="
 	@echo "All deployment checks passed!"

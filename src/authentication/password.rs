@@ -29,7 +29,7 @@ pub async fn validate_credentials(
 ) -> Result<Uuid, AuthError> {
     let mut user_id = None;
 
-    // This is to prevent user enumeration vulnerability or timing attacks
+    // Dummy hash ensures constant-time response even for unknown usernames, timing-based or user enumeration vulnerability attacks
     let mut expected_password_hash = Secret::new(
         "$argon2id$v=19$m=15000,t=2,p=1$\
         gZiV/M1gPc22ElAH/Jh1Hw$\
@@ -52,7 +52,7 @@ pub async fn validate_credentials(
         .await
         .context("Failed to spawn blocking task.")??;
 
-    // This is to prevent user enumeration vulnerability or timing attacks
+    // Always verify hash before checking user_id to prevent timing-based or user enumeration vulnerability attacks
     user_id
         .ok_or_else(|| anyhow::anyhow!("Unknown username."))
         .map_err(AuthError::InvalidCredentials)

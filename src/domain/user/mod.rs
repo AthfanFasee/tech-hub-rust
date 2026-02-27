@@ -3,6 +3,7 @@ mod user_email;
 mod user_name;
 mod user_password;
 
+use secrecy::{ExposeSecret, Secret};
 pub use types::*;
 pub use user_email::UserEmail;
 pub use user_name::UserName;
@@ -23,6 +24,24 @@ impl NewUser {
         })
     }
 }
+
+#[derive(serde::Deserialize)]
+pub struct ChangePasswordData {
+    current_password: Secret<String>,
+    new_password: Secret<String>,
+}
+
+impl TryFrom<ChangePasswordData> for (UserPassword, UserPassword) {
+    type Error = String;
+
+    fn try_from(payload: ChangePasswordData) -> Result<Self, Self::Error> {
+        let current_password =
+            UserPassword::parse(payload.current_password.expose_secret().to_string())?;
+        let new_password = UserPassword::parse(payload.new_password.expose_secret().to_string())?;
+        Ok((current_password, new_password))
+    }
+}
+
 
 #[cfg(test)]
 mod tests {

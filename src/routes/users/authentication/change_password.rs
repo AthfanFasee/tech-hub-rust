@@ -2,16 +2,15 @@ use std::fmt::{self, Debug, Formatter};
 
 use actix_web::{HttpResponse, ResponseError, http::StatusCode, web};
 use anyhow::Context;
-use secrecy::{ExposeSecret, Secret};
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::{
     authentication,
     authentication::{AuthError, Credentials, UserId},
-    domain::UserPassword,
     utils,
 };
+use crate::domain::ChangePasswordData;
 
 #[derive(thiserror::Error)]
 pub enum ChangePasswordError {
@@ -40,24 +39,6 @@ impl ResponseError for ChangePasswordError {
         utils::build_error_response(status_code, self.to_string())
     }
 }
-
-#[derive(serde::Deserialize)]
-pub struct ChangePasswordData {
-    current_password: Secret<String>,
-    new_password: Secret<String>,
-}
-
-impl TryFrom<ChangePasswordData> for (UserPassword, UserPassword) {
-    type Error = String;
-
-    fn try_from(payload: ChangePasswordData) -> Result<Self, Self::Error> {
-        let current_password =
-            UserPassword::parse(payload.current_password.expose_secret().to_string())?;
-        let new_password = UserPassword::parse(payload.new_password.expose_secret().to_string())?;
-        Ok((current_password, new_password))
-    }
-}
-
 #[tracing::instrument(
     skip_all,
     fields(user_id=%&*user_id)
