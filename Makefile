@@ -23,7 +23,7 @@
 
 .PHONY: \
 	install-nightly ensure-nightly install-nextest ensure-nextest help \
-	lint lint-nightly security-audit audit security-audit-full audit-full \
+	lint lint-nightly security-audit audit security-audit-full audit-full deployment-check \
 	run run-full run-scratch \
 	test test-full test-scratch test-log test-log-debug test-single test-release \
 	unit-test-stress-quick unit-test-stress-standard unit-test-stress-thorough unit-test-stress-log \
@@ -86,6 +86,7 @@ help:
 	@echo "  make security-audit        Check for vulnerabilities"
 	@echo "  make audit                 Security audit + tests"
 	@echo "  make audit-full            Security audit + tests + fuzzing (~15min)"
+	@echo "  make deployment-check      Full audit + release tests (pre-deploy)"
 	@echo ""
 	@echo "RUN:"
 	@echo "  make run                   Lint + run app (uses existing containers)"
@@ -203,6 +204,16 @@ security-audit-full: security-audit test
 # Full audit with fuzz: runs security audit, tests, and fuzz
 audit-full: security-audit-full
 	@echo "Full audit with fuzzing completed successfully!"
+
+# Deployment ready check: full security audit + release tests + license/source verification
+# Ensures the codebase is clean, secure, and production-ready before deploying
+deployment-check: security-audit test-nx-release
+	@echo ""
+	@echo "=========================================="
+	@echo "All deployment checks passed!"
+	@echo "Binary is audited, tested in release mode,"
+	@echo "and dependencies are clean."
+	@echo "=========================================="
 
 
 
