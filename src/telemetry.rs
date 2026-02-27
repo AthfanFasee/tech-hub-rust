@@ -29,9 +29,11 @@ where
         .with(formatting_layer)
 }
 
-// `init_subscriber` should only be called once!
+// `init_subscriber` should only be called once, or it will panic!
 pub fn init_subscriber(subscriber: impl Subscriber + Send + Sync) {
+    // Can Panic
     LogTracer::init().expect("Failed to set logger");
+    // Can Panic
     subscriber::set_global_default(subscriber).expect("Failed to set subscriber");
 }
 

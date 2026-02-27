@@ -1,7 +1,7 @@
 use anyhow::Context;
 use argon2::{
-    Algorithm, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier, Version,
-    password_hash::SaltString,
+    password_hash::SaltString, Algorithm, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier,
+    Version,
 };
 use secrecy::{ExposeSecret, Secret};
 use sqlx::PgPool;
@@ -49,8 +49,8 @@ pub async fn validate_credentials(
     telemetry::spawn_blocking_with_tracing(move || {
         verify_password_hash(expected_password_hash, credentials.password)
     })
-    .await
-    .context("Failed to spawn blocking task.")??;
+        .await
+        .context("Failed to spawn blocking task.")??;
 
     // This is to prevent user enumeration vulnerability or timing attacks
     user_id
@@ -87,11 +87,11 @@ async fn get_stored_credentials(
         "#,
         username,
     )
-    .fetch_optional(pool)
-    .await
-    .context("Failed to perform a query to retrieve stored credentials.")?
-    // At this point, row is an `Option<Row>`. After this, row becomes `Option<(Uuid, Secret<String>)>`
-    .map(|row| (row.id, Secret::new(row.password_hash)));
+        .fetch_optional(pool)
+        .await
+        .context("Failed to perform a query to retrieve stored credentials.")?
+        // At this point, row is an `Option<Row>`. After this, row becomes `Option<(Uuid, Secret<String>)>`
+        .map(|row| (row.id, Secret::new(row.password_hash)));
     Ok(row)
 }
 
@@ -114,9 +114,9 @@ pub async fn change_password(
         password_hash.expose_secret(),
         user_id
     )
-    .execute(pool)
-    .await
-    .context("Failed to change user's password")?;
+        .execute(pool)
+        .await
+        .context("Failed to change user's password")?;
     Ok(())
 }
 
@@ -126,9 +126,9 @@ pub fn compute_password_hash(password: Secret<String>) -> Result<Secret<String>,
         Algorithm::Argon2id,
         Version::V0x13,
         // Safe to panic here as params are hardcoded constants, any failure would be caught at dev/test time
-        Params::new(15000, 2, 1, None).expect("Failed to build Argon2 params"),
+        Params::new(15000, 2, 1, None).expect("Hardcoded Argon2 parameters should always be valid"),
     )
-    .hash_password(password.expose_secret().as_bytes(), &salt)?
-    .to_string();
+        .hash_password(password.expose_secret().as_bytes(), &salt)?
+        .to_string();
     Ok(Secret::new(password_hash))
 }

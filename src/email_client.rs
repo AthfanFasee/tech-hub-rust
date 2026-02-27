@@ -43,7 +43,7 @@ impl EmailClient {
             .timeout(timeout)
             .build()
             // Safe to unwrap as builder only fails on invalid TLS/config, not a simple timeout setup
-            .expect("Failed to build reqwest HTTP client");
+            .expect("Reqwest HTTP client with a simple timeout should always build successfully");
 
         Self {
             http_client,
