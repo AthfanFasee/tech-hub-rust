@@ -125,7 +125,8 @@ pub fn compute_password_hash(password: Secret<String>) -> Result<Secret<String>,
     let password_hash = Argon2::new(
         Algorithm::Argon2id,
         Version::V0x13,
-        Params::new(15000, 2, 1, None).unwrap(),
+        // Safe to panic here as params are hardcoded constants, any failure would be caught at dev/test time
+        Params::new(15000, 2, 1, None).expect("Failed to build Argon2 params"),
     )
     .hash_password(password.expose_secret().as_bytes(), &salt)?
     .to_string();

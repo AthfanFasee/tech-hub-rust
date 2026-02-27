@@ -39,7 +39,11 @@ impl EmailClient {
         authorization_token: Secret<String>,
         timeout: Duration,
     ) -> Self {
-        let http_client = Client::builder().timeout(timeout).build().unwrap();
+        let http_client = Client::builder()
+            .timeout(timeout)
+            .build()
+            // Safe to unwrap as builder only fails on invalid TLS/config, not a simple timeout setup
+            .expect("Failed to build reqwest HTTP client");
 
         Self {
             http_client,

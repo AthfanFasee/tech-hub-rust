@@ -1,3 +1,4 @@
+#![allow(clippy::unwrap_used)]
 mod admin;
 mod comments;
 mod health_check;

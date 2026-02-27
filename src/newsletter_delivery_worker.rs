@@ -96,7 +96,9 @@ pub async fn try_execute_task(
         return Ok(ExecutionOutcome::EmptyQueue);
     }
 
-    let (mut transaction, issue_id, email, n_retries) = maybe_task.unwrap();
+    // Safe to unwrap here as None case is handled by the early return above
+    let (mut transaction, issue_id, email, n_retries) =
+        maybe_task.expect("maybe_task was None despite passing the is_none() guard");
 
     Span::current()
         .record("newsletter_issue_id", field::display(issue_id))
