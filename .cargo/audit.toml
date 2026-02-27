@@ -1,0 +1,11 @@
+[advisories]
+ignore = [
+    # Marvin Attack timing side-channel in rsa crate — comes from sqlx-mysql
+    # which is a transitive dep we don't directly use (we use sqlx-postgres only).
+    # No fix available upstream yet.
+    "RUSTSEC-2023-0071",
+    # rustls-pemfile marked unmaintained — transitive dep pulled in via
+    # redis -> actix-session. No action available on our end until these crates
+    # update their deps.
+    "RUSTSEC-2025-0134",
+]

@@ -134,7 +134,7 @@ lint-nightly: ensure-nightly
 	@echo "Updating dependencies to latest compatible versions..."
 	@cargo update
 	@echo "Running cargo fmt with nightly (for import merging)..."
-	cargo +nightly fmt -- --config-path rustfmt-nightly.toml
+	cargo +nightly fmt -- --config-path .cargo/rustfmt-nightly.toml
 	@echo "Running cargo check..."
 	cargo check
 
@@ -145,9 +145,11 @@ security-audit:
 	@echo "Running security audit for vulnerabilities..."
 	@cargo audit || (echo "CRITICAL: Security vulnerabilities found!")
 	@echo "Checking for banned crates (ignoring duplicates)..."
-	@cargo deny check bans -A duplicate || (echo "CRITICAL: Banned crates found!")
+	@cargo deny check --config .cargo/deny.toml bans -A duplicate || (echo "CRITICAL: Banned crates found!")
 	@echo "Verifying dependency sources..."
-	@cargo deny check sources || (echo "CRITICAL: Untrusted dependency sources detected!")
+	@cargo deny check --config .cargo/deny.toml sources || (echo "CRITICAL: Untrusted dependency sources detected!")
+	@echo "Verifying dependency licenses..."
+	@cargo deny check --config .cargo/deny.toml licenses || (echo "CRITICAL: Unlicensed or disallowed licenses found!")
 	@echo "All security checks passed!"
 
 # Full audit command: runs security audit and tests
@@ -215,7 +217,7 @@ test-full: lint-nightly
 
 # Test scratch command: creates new containers and runs tests
 test-scratch: migrate-new redis-new
-	@$(MAKE) test
+	@$(MAKE) --no-print-directory test
 
 # Test log command: performs check, format, then runs tests with bunyan logging
 test-log: lint-nightly
