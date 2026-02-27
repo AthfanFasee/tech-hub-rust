@@ -22,11 +22,13 @@
 # ==================================================================================== #
 
 .PHONY: \
-	install-nightly ensure-nightly help \
+	install-nightly ensure-nightly install-nextest ensure-nextest help \
 	lint lint-nightly security-audit audit security-audit-full audit-full \
 	run run-full run-scratch \
 	test test-full test-scratch test-log test-log-debug test-single test-release \
 	unit-test-stress-quick unit-test-stress-standard unit-test-stress-thorough unit-test-stress-log \
+	test-nx test-nx-full test-nx-scratch test-nx-log test-nx-log-debug test-nx-single test-nx-release \
+	unit-test-nx-stress-quick unit-test-nx-stress-standard unit-test-nx-stress-thorough unit-test-nx-stress-log \
 	migrate-add migrate migrate-new \
 	fuzz fuzz-single fuzz-domain fuzz-intensive fuzz-coverage fuzz-clean init-fuzz-corpus \
 	redis redis-new
@@ -54,6 +56,20 @@ install-nightly:
 	@echo "Nightly toolchain installed successfully!"
 	@echo ""
 	@echo "You can now use 'make lint-nightly' and other commands that require nightly."
+
+# Ensure nextest is installed (installs if missing)
+ensure-nextest:
+	@cargo nextest --version > /dev/null 2>&1 || \
+		(echo "cargo-nextest not found. Installing now..." && cargo install --locked cargo-nextest) || \
+		(echo "ERROR: Failed to install cargo-nextest. Run 'make install-nextest' manually." && exit 1)
+
+# Install cargo-nextest: next-generation test runner with cleaner output and faster parallel execution
+install-nextest:
+	@echo "Installing cargo-nextest..."
+	cargo install --locked cargo-nextest
+	@echo "cargo-nextest installed successfully!"
+	@echo ""
+	@echo "You can now use 'make test-nx' and other nextest commands."
 
 # Help command: displays available commands and setup info
 help:
@@ -88,6 +104,21 @@ help:
 	@echo "  make unit-test-stress-quick      Run unit tests 10x"
 	@echo "  make unit-test-stress-standard   Run unit tests 20x"
 	@echo "  make unit-test-stress-thorough   Run unit tests 50x"
+	@echo ""
+	@echo "SETUP:"
+	@echo "  make install-nextest           Install cargo-nextest test runner"
+	@echo "TEST (nextest - cleaner output, faster):"
+	@echo "  make test-nx                   Run all tests via nextest"
+	@echo "  make test-nx-full              Start containers + run nextest"
+	@echo "  make test-nx-scratch           Fresh containers + run nextest"
+	@echo "  make test-nx-log               Run nextest with bunyan logs"
+	@echo "  make test-nx-single name=X     Run specific test with logs"
+	@echo "  make test-nx-release           Run nextest in release mode"
+	@echo ""
+	@echo "STRESS TEST (nextest):"
+	@echo "  make unit-test-nx-stress-quick      Run unit tests 10x via nextest"
+	@echo "  make unit-test-nx-stress-standard   Run unit tests 20x via nextest"
+	@echo "  make unit-test-nx-stress-thorough   Run unit tests 50x via nextest"
 	@echo ""
 	@echo "DATABASE:"
 	@echo "  make migrate               Run migrations (skip docker)"
@@ -277,6 +308,91 @@ unit-test-stress-log: lint-nightly
 	@for i in $$(seq 1 10); do \
 		echo "=== Unit test run $$i/10 ==="; \
 		export RUST_LOG="sqlx=error,info,error" && export TEST_LOG=true && cargo test --lib | bunyan || exit 1; \
+	done
+	@echo "Unit stress test with logging completed! All 10 runs passed."
+
+
+
+# ==================================================================================== #
+# TEST (nextest — cleaner output, per-test timing, faster parallel execution)
+# Note: nextest does not run doc-tests. Run 'cargo test --doc' separately if needed.
+# ==================================================================================== #
+
+# Test command: lint then run all tests via nextest
+test-nx: lint-nightly ensure-nextest
+	@echo "Running tests via cargo-nextest (skipping doc-tests)..."
+	@unset RUST_LOG && unset TEST_LOG && cargo nextest run
+
+# Test full command: start existing containers then run nextest
+test-nx-full: lint-nightly ensure-nextest
+	@echo "Starting existing Postgres and Redis containers..."
+	@docker start techhub_postgres || echo "Postgres container not found. Run 'make run-scratch' instead."
+	@docker start techhub_redis || echo "Redis container not found. Run 'make run-scratch' instead."
+	@$(MAKE) --no-print-directory test-nx
+
+# Test scratch command: fresh containers then run nextest
+test-nx-scratch: migrate-new redis-new
+	@$(MAKE) --no-print-directory test-nx
+
+# Test log command: run nextest with bunyan logging
+test-nx-log: lint-nightly ensure-nextest
+	@echo "Running tests via nextest with bunyan formatted logs..."
+	@export RUST_LOG="sqlx=error,info,error" && export TEST_LOG=true && cargo nextest run --no-capture 2>&1 | bunyan
+
+# Test log debug command: run nextest with debug-level bunyan logging
+test-nx-log-debug: lint-nightly ensure-nextest
+	@echo "Running tests via nextest with bunyan formatted logs in debug mode..."
+	@export RUST_LOG="debug" && export TEST_LOG=true && cargo nextest run --no-capture 2>&1 | bunyan
+
+# Test single command: run a specific test by name with bunyan logging
+# Usage: make test-nx-single name=your_test_name
+test-nx-single: lint-nightly ensure-nextest
+	@if [ -z "$(name)" ]; then \
+		echo "Error: please provide a test name, e.g.:"; \
+		echo "   make test-nx-single name=logout_clears_session_state"; \
+		exit 1; \
+	fi
+	@echo "Running test via nextest for '$(name)' with bunyan formatted logs in debug mode..."
+	@export RUST_LOG="sqlx=error,debug" && export TEST_LOG=true && cargo nextest run --no-capture $(name) 2>&1 | bunyan
+
+# Test release command: run nextest in release mode
+test-nx-release: lint-nightly ensure-nextest
+	@echo "Running tests via nextest in release mode (skipping doc-tests)..."
+	@unset RUST_LOG && unset TEST_LOG && cargo nextest run --release
+	@echo "Release mode test completed!"
+
+# Stress test commands: run only lib (unit) tests multiple times via nextest
+# nextest's --test-threads controls parallelism per run
+unit-test-nx-stress-quick: lint-nightly ensure-nextest
+	@echo "Running unit tests 10 times via nextest for quick property-based testing..."
+	@for i in $$(seq 1 10); do \
+		echo "=== Unit test run $$i/10 ==="; \
+		unset RUST_LOG && unset TEST_LOG && cargo nextest run --lib || exit 1; \
+	done
+	@echo "Quick stress test completed! All 10 runs passed."
+
+unit-test-nx-stress-standard: lint-nightly ensure-nextest
+	@echo "Running unit tests 20 times via nextest for thorough property-based testing..."
+	@for i in $$(seq 1 20); do \
+		echo "=== Unit test run $$i/20 ==="; \
+		unset RUST_LOG && unset TEST_LOG && cargo nextest run --lib || exit 1; \
+	done
+	@echo "Standard stress test completed! All 20 runs passed."
+
+unit-test-nx-stress-thorough: lint-nightly ensure-nextest
+	@echo "Running unit tests 50 times via nextest for exhaustive property-based testing..."
+	@for i in $$(seq 1 50); do \
+		echo "=== Unit test run $$i/50 ==="; \
+		unset RUST_LOG && unset TEST_LOG && cargo nextest run --lib || exit 1; \
+	done
+	@echo "Thorough stress test completed! All 50 runs passed."
+
+# Stress test with logging: run unit tests 10 times via nextest with bunyan logging
+unit-test-nx-stress-log: lint-nightly ensure-nextest
+	@echo "Running unit tests 10 times via nextest with bunyan logging..."
+	@for i in $$(seq 1 10); do \
+		echo "=== Unit test run $$i/10 ==="; \
+		export RUST_LOG="sqlx=error,info,error" && export TEST_LOG=true && cargo nextest run --lib --no-capture 2>&1 | bunyan || exit 1; \
 	done
 	@echo "Unit stress test with logging completed! All 10 runs passed."
 
