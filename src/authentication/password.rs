@@ -1,13 +1,13 @@
 use anyhow::Context;
 use argon2::{
-    password_hash::SaltString, Algorithm, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier,
-    Version,
+    Algorithm, Argon2, Params, PasswordHash, PasswordHasher, PasswordVerifier, Version,
+    password_hash::SaltString,
 };
 use secrecy::{ExposeSecret, Secret};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::telemetry;
+use crate::{repository, telemetry};
 
 #[derive(thiserror::Error, Debug)]
 pub enum AuthError {
@@ -38,7 +38,7 @@ pub async fn validate_credentials(
     );
 
     if let Some((stored_user_id, stored_password_hash)) =
-        get_stored_credentials(&credentials.user_name, pool).await?
+        repository::get_stored_credentials(&credentials.user_name, pool).await?
     {
         user_id = Some(stored_user_id);
         expected_password_hash = stored_password_hash;
@@ -49,8 +49,8 @@ pub async fn validate_credentials(
     telemetry::spawn_blocking_with_tracing(move || {
         verify_password_hash(expected_password_hash, credentials.password)
     })
-        .await
-        .context("Failed to spawn blocking task.")??;
+    .await
+    .context("Failed to spawn blocking task.")??;
 
     // Always verify hash before checking user_id to prevent timing-based or user enumeration vulnerability attacks
     user_id
@@ -74,27 +74,6 @@ fn verify_password_hash(
         .map_err(AuthError::InvalidCredentials)
 }
 
-async fn get_stored_credentials(
-    username: &str,
-    pool: &PgPool,
-) -> Result<Option<(Uuid, Secret<String>)>, anyhow::Error> {
-    let row = sqlx::query!(
-        r#"
-        SELECT id, password_hash
-        FROM users
-        WHERE user_name = $1
-        and is_activated = true
-        "#,
-        username,
-    )
-        .fetch_optional(pool)
-        .await
-        .context("Failed to perform a query to retrieve stored credentials.")?
-        // At this point, row is an `Option<Row>`. After this, row becomes `Option<(Uuid, Secret<String>)>`
-        .map(|row| (row.id, Secret::new(row.password_hash)));
-    Ok(row)
-}
-
 #[tracing::instrument(skip(password, pool))]
 pub async fn change_password(
     user_id: Uuid,
@@ -105,21 +84,9 @@ pub async fn change_password(
         telemetry::spawn_blocking_with_tracing(move || compute_password_hash(password))
             .await?
             .context("Failed to hash password")?;
-    sqlx::query!(
-        r#"
-        UPDATE users
-        SET password_hash = $1
-        WHERE id = $2 and is_activated = true
-        "#,
-        password_hash.expose_secret(),
-        user_id
-    )
-        .execute(pool)
-        .await
-        .context("Failed to change user's password")?;
-    Ok(())
-}
 
+    repository::update_password_hash(user_id, password_hash, pool).await
+}
 pub fn compute_password_hash(password: Secret<String>) -> Result<Secret<String>, anyhow::Error> {
     let salt = SaltString::generate(&mut rand::thread_rng());
     let password_hash = Argon2::new(
@@ -128,7 +95,7 @@ pub fn compute_password_hash(password: Secret<String>) -> Result<Secret<String>,
         // Safe to panic here as params are hardcoded constants, any failure would be caught at dev/test time
         Params::new(15000, 2, 1, None).expect("Hardcoded Argon2 parameters should always be valid"),
     )
-        .hash_password(password.expose_secret().as_bytes(), &salt)?
-        .to_string();
+    .hash_password(password.expose_secret().as_bytes(), &salt)?
+    .to_string();
     Ok(Secret::new(password_hash))
 }

@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use techhub::newsletter_delivery_worker;
 use uuid::Uuid;
 use wiremock::{Mock, ResponseTemplate, matchers};
 
@@ -553,9 +552,7 @@ async fn cleanup_old_newsletter_issues_deletes_issues_older_than_7_days() {
     .await
     .unwrap();
 
-    newsletter_delivery_worker::cleanup_old_newsletter_issues(pool)
-        .await
-        .unwrap();
+    app.cleanup_old_newsletter_issues().await;
 
     // Old newsletter should be deleted
     let old_exists = sqlx::query_scalar!(

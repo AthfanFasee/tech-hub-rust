@@ -1,16 +1,14 @@
 use std::fmt::{self, Debug, Formatter};
 
 use actix_web::{HttpResponse, ResponseError, http::StatusCode, web};
-use anyhow::Context;
 use sqlx::PgPool;
-use uuid::Uuid;
 
 use crate::{
     authentication,
     authentication::{AuthError, Credentials, UserId},
-    utils,
+    domain::ChangePasswordData,
+    repository, utils,
 };
-use crate::domain::ChangePasswordData;
 
 #[derive(thiserror::Error)]
 pub enum ChangePasswordError {
@@ -49,7 +47,7 @@ pub async fn change_password(
     user_id: web::ReqData<UserId>,
 ) -> Result<HttpResponse, ChangePasswordError> {
     let user_id = user_id.into_inner();
-    let username = get_username(*user_id, &pool).await?;
+    let username = repository::get_username(*user_id, &pool).await?;
 
     let (current_password, new_password) = payload
         .0
@@ -71,19 +69,4 @@ pub async fn change_password(
     authentication::change_password(*user_id, new_password.into_secret(), &pool).await?;
 
     Ok(HttpResponse::Ok().finish())
-}
-
-pub async fn get_username(user_id: Uuid, pool: &PgPool) -> Result<String, anyhow::Error> {
-    let row = sqlx::query!(
-        r#"
-        SELECT user_name
-        FROM users
-        WHERE id = $1 and is_activated = true
-        "#,
-        user_id,
-    )
-    .fetch_one(pool)
-    .await
-    .context("Failed to perform a query to retrieve a username.")?;
-    Ok(row.user_name)
 }

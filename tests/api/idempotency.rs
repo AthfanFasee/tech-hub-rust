@@ -1,5 +1,3 @@
-use techhub::newsletter_delivery_worker;
-
 use crate::helpers;
 
 #[tokio::test]
@@ -33,9 +31,7 @@ async fn cleanup_old_idempotency_records_deletes_records_older_than_48_hours() {
     .await
     .unwrap();
 
-    newsletter_delivery_worker::cleanup_old_idempotency_records(pool)
-        .await
-        .unwrap();
+    app.cleanup_old_idempotency_records().await;
 
     // The old record should be deleted
     let old_exists = sqlx::query_scalar!(

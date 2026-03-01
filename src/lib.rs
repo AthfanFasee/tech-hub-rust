@@ -5,6 +5,7 @@ pub mod domain;
 pub mod email_client;
 pub mod idempotency;
 pub mod newsletter_delivery_worker;
+pub mod repository;
 pub mod routes;
 pub mod session_state;
 pub mod startup;

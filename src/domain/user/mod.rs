@@ -42,7 +42,6 @@ impl TryFrom<ChangePasswordData> for (UserPassword, UserPassword) {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use claims::assert_ok;

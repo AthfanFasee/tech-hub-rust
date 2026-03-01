@@ -1,35 +1,19 @@
 use actix_web::{HttpResponse, web};
-use anyhow::Context;
 use sqlx::PgPool;
 
 use crate::{
-    authentication::UserId,
+    repository,
     routes::{PostError, PostPathParams},
 };
 
-#[tracing::instrument(
-    skip(pool),
-    fields(post_id=%path.id)
-)]
 pub async fn hard_delete_post(
     path: web::Path<PostPathParams>,
     pool: web::Data<PgPool>,
-    user_id: web::ReqData<UserId>,
 ) -> Result<HttpResponse, PostError> {
     let post_id = path.id;
 
-    let result = sqlx::query!(
-        r#"
-        DELETE FROM posts
-	    WHERE id = $1
-        "#,
-        post_id
-    )
-    .execute(&**pool)
-    .await
-    .context("Failed to hard delete posts")?;
-
-    if result.rows_affected() == 0 {
+    let deleted = repository::hard_delete_post(post_id, &pool).await?;
+    if !deleted {
         return Err(PostError::NotFound);
     }
 

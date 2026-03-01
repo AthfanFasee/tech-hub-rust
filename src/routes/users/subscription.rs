@@ -4,13 +4,12 @@ use actix_web::{HttpResponse, ResponseError, http::StatusCode, web};
 use anyhow::Context;
 use sqlx::PgPool;
 use tracing::{Span, field};
-use uuid::Uuid;
 
 use crate::{
     authentication::UserId,
     domain::UserEmail,
     email_client::{EmailClient, EmailError},
-    routes::users::authentication::register,
+    repository,
     startup::ApplicationBaseUrl,
     utils,
 };
@@ -58,40 +57,14 @@ pub async fn subscribe_user(
     parameters: web::Query<SubscribeUserParameters>,
     pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, SubscriptionError> {
-    let user_id = register::get_user_id_from_token(&pool, &parameters.token)
+    let user_id = repository::get_user_id_from_token(&pool, &parameters.token)
         .await?
         // Domain error (invalid token), so a new `UserConfirmError::UnknownToken` error is created instead of wrapping an `anyhow::Error`
         .ok_or(SubscriptionError::UnknownToken)?;
     Span::current().record("user_id", field::display(user_id));
 
-    subscribe_user_and_delete_token(&pool, user_id, &parameters.token).await?;
+    repository::subscribe_user_and_delete_token(&pool, user_id, &parameters.token).await?;
     Ok(HttpResponse::Ok().finish())
-}
-
-#[tracing::instrument(skip(pool, token))]
-pub async fn subscribe_user_and_delete_token(
-    pool: &PgPool,
-    user_id: Uuid,
-    token: &str,
-) -> Result<(), anyhow::Error> {
-    sqlx::query!(
-        r#"
-        WITH subscribe_user AS (
-            UPDATE users
-            SET is_subscribed = true
-            WHERE id = $1 and is_activated = true
-        )
-        DELETE FROM tokens
-        WHERE token = $2 AND user_id = $1 AND is_subscription = true
-        "#,
-        user_id,
-        token,
-    )
-    .execute(pool)
-    .await
-    .context("Failed to update the user status as subscribed")?;
-
-    Ok(())
 }
 
 #[tracing::instrument(
@@ -105,12 +78,12 @@ pub async fn request_subscription(
     user_id: web::ReqData<UserId>,
 ) -> Result<HttpResponse, SubscriptionError> {
     let user_id = user_id.into_inner();
-    let user_email = get_user_email(*user_id, &pool).await?;
+    let user_email = repository::get_user_email(*user_id, &pool).await?;
     let email = UserEmail::parse(user_email).map_err(SubscriptionError::ValidationError)?;
 
     let activation_token = utils::generate_token();
 
-    store_subscription_token(&pool, *user_id, &activation_token).await?;
+    repository::store_subscription_token(&pool, *user_id, &activation_token).await?;
 
     send_subscription_email(&email_client, email, &base_url.0, &activation_token)
         .await
@@ -140,39 +113,4 @@ pub async fn send_subscription_email(
     email_client
         .send_email(&user_email, "Welcome!", &html_body, &plain_body)
         .await
-}
-
-pub async fn get_user_email(user_id: Uuid, pool: &PgPool) -> Result<String, anyhow::Error> {
-    let row = sqlx::query!(
-        r#"
-        SELECT email
-        FROM users
-        WHERE id = $1 and is_activated = true
-        "#,
-        user_id,
-    )
-    .fetch_one(pool)
-    .await
-    .context("Failed to perform a query to retrieve a user email.")?;
-    Ok(row.email)
-}
-
-#[tracing::instrument(skip(token, pool))]
-pub async fn store_subscription_token(
-    pool: &PgPool,
-    user_id: Uuid,
-    token: &str,
-) -> Result<(), anyhow::Error> {
-    sqlx::query!(
-        r#"INSERT INTO tokens (token, user_id, is_subscription)
-            VALUES ($1, $2, $3)"#,
-        token,
-        user_id,
-        true,
-    )
-    .execute(pool)
-    .await
-    .context("Failed to store the user subscription token")?;
-
-    Ok(())
 }

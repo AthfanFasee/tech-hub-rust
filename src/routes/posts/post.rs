@@ -2,7 +2,6 @@ use std::fmt::{self, Debug, Formatter};
 
 use actix_web::{HttpResponse, ResponseError, http::StatusCode, web};
 use anyhow::Context;
-use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use sqlx::PgPool;
 use tracing::Span;
@@ -11,11 +10,10 @@ use uuid::Uuid;
 use crate::{
     authentication::{IsAdmin, UserId},
     domain::{
-        CreatePostPayload, CreatePostResponse, CreatedBy, Filters, GetAllPostsQuery, Metadata,
-        Post, PostImg, PostQuery, PostRecord, PostResponse, PostText, PostTitle, QueryTitle,
-        SortDirection, UpdatePostPayload,
+        CreatePostPayload, CreatePostResponse, GetAllPostsQuery, Metadata, Post, PostQuery,
+        UpdatePostPayload,
     },
-    utils,
+    repository, utils,
 };
 
 #[derive(thiserror::Error)]
@@ -64,7 +62,7 @@ pub async fn get_all_posts(
     let parsed_query =
         PostQuery::try_from(query.into_inner()).map_err(PostError::ValidationError)?;
 
-    let (posts, total_records) = fetch_posts_with_count(
+    let (posts, total_records) = repository::get_all_posts(
         parsed_query.title.as_ref(),
         parsed_query.created_by_id.as_ref(),
         &parsed_query.filters,
@@ -84,75 +82,6 @@ pub async fn get_all_posts(
     })))
 }
 
-#[tracing::instrument(skip(pool))]
-async fn fetch_posts_with_count(
-    title: Option<&QueryTitle>,
-    created_by_id: Option<&CreatedBy>,
-    filters: &Filters,
-    pool: &PgPool,
-) -> Result<(Vec<PostResponse>, i64), PostError> {
-    let title_search = title.map(|t| t.as_ref().to_string()).unwrap_or_default();
-    let offset = filters.offset() as i64;
-    let limit = filters.limit.value() as i64;
-    let sort_clause = filters.sort.to_sql();
-
-    // Build WHERE clause conditionally based on created_by_id
-    let (where_clause, params_count) = if created_by_id.is_some() {
-        (
-            "WHERE (to_tsvector('english', title) @@ plainto_tsquery('english', $1) OR $1 = '')
-        AND p.created_by = $2
-        AND p.deleted_at IS NULL",
-            2,
-        )
-    } else {
-        (
-            "WHERE (to_tsvector('english', title) @@ plainto_tsquery('english', $1) OR $1 = '')
-        AND p.deleted_at IS NULL",
-            1,
-        )
-    };
-
-    let query = format!(
-        r#"
-        SELECT COUNT(*) OVER()::BIGINT AS total_count,
-               p.id, p.title, p.post_text, p.img, p.version,
-               p.liked_by, p.created_by, p.created_at, u.user_name as created_by_name
-        FROM posts p
-        INNER JOIN users u ON p.created_by = u.id
-        {}
-        ORDER BY {}, p.created_at {}
-        LIMIT ${} OFFSET ${}
-        "#,
-        where_clause,
-        sort_clause,
-        match filters.sort.direction {
-            SortDirection::Desc => "DESC",
-            SortDirection::Asc => "ASC",
-        },
-        params_count + 1,
-        params_count + 2
-    );
-
-    let mut query_builder = sqlx::query_as::<_, PostRecord>(&query).bind(&title_search);
-
-    if let Some(creator_id) = created_by_id {
-        query_builder = query_builder.bind(creator_id.as_ref());
-    }
-
-    let records = query_builder
-        .bind(limit)
-        .bind(offset)
-        .fetch_all(pool)
-        .await
-        .context("Failed to fetch posts")?;
-
-    let total_count = records.first().map(|r| r.total_count).unwrap_or(0);
-
-    let posts = records.into_iter().map(PostResponse::from).collect();
-
-    Ok((posts, total_count))
-}
-
 #[derive(Deserialize, Debug)]
 pub struct PostPathParams {
     pub id: Uuid,
@@ -164,29 +93,9 @@ pub async fn get_post(
 ) -> Result<HttpResponse, PostError> {
     let post_id = path.id;
 
-    let post = get_post_by_id(post_id, &pool).await?;
+    let post = repository::get_post(post_id, &pool).await?;
 
     Ok(HttpResponse::Ok().json(serde_json::json!({"posts": post})))
-}
-
-async fn get_post_by_id(id: Uuid, pool: &PgPool) -> Result<PostResponse, PostError> {
-    let record = sqlx::query_as::<_, PostRecord>(
-        r#"
-        SELECT 0::BIGINT as total_count, p.id, p.title, p.post_text, p.img, p.version, p.liked_by, p.created_by, p.created_at, u.user_name as created_by_name
-        FROM posts p
-        INNER JOIN users u ON p.created_by = u.id
-        WHERE p.id = $1 AND deleted_at IS NULL
-        "#,
-    )
-        .bind(id)
-        .fetch_optional(pool)
-        .await
-        .context("Failed to fetch posts")?;
-
-    match record {
-        Some(rec) => Ok(PostResponse::from(rec)),
-        None => Err(PostError::NotFound),
-    }
 }
 
 #[tracing::instrument(
@@ -202,7 +111,7 @@ pub async fn create_post(
     let post: Post = payload.0.try_into().map_err(PostError::ValidationError)?;
 
     let (id, created_at) =
-        insert_post_and_return_inserted_data(&post.title, &post.text, &post.img, user_id, &pool)
+        repository::insert_post(&post.title, &post.text, &post.img, user_id, &pool)
             .await
             .context("Failed to insert posts record")?;
 
@@ -216,36 +125,6 @@ pub async fn create_post(
     };
 
     Ok(HttpResponse::Created().json(response))
-}
-
-#[tracing::instrument(
-    skip_all,
-    fields(post_id=tracing::field::Empty)
-)]
-pub async fn insert_post_and_return_inserted_data(
-    title: &PostTitle,
-    text: &PostText,
-    img: &PostImg,
-    created_by: UserId,
-    pool: &PgPool,
-) -> Result<(Uuid, DateTime<Utc>), anyhow::Error> {
-    let record = sqlx::query!(
-        r#"
-        INSERT INTO posts (id, title, post_text, img, created_by)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING id, created_at
-        "#,
-        Uuid::new_v4(),
-        title.as_ref(),
-        text.as_ref(),
-        img.as_ref(),
-        *created_by,
-    )
-    .fetch_one(pool)
-    .await
-    .context("Failed to insert new posts")?;
-    Span::current().record("post_id", tracing::field::display(&record.id));
-    Ok((record.id, record.created_at))
 }
 
 #[tracing::instrument(
@@ -267,7 +146,7 @@ pub async fn update_post(
 
     // If not admin, verify ownership
     if !is_admin {
-        let is_owner = did_user_create_the_post(post_id, *user_id, &pool).await?;
+        let is_owner = repository::did_user_create_the_post(post_id, *user_id, &pool).await?;
 
         if !is_owner {
             return Err(PostError::Forbidden);
@@ -275,9 +154,9 @@ pub async fn update_post(
     }
 
     let validated_post: Post = payload.0.try_into().map_err(PostError::ValidationError)?;
-    let mut post = get_post_by_id(post_id, &pool).await?;
+    let mut post = repository::get_post(post_id, &pool).await?;
 
-    update_post_in_db(
+    repository::update_post(
         post.id,
         &validated_post.title,
         &validated_post.text,
@@ -294,42 +173,6 @@ pub async fn update_post(
     Ok(HttpResponse::Ok().json(serde_json::json!({ "posts": post })))
 }
 
-#[tracing::instrument(skip_all, fields(post_id=%id))]
-async fn update_post_in_db(
-    id: Uuid,
-    title: &PostTitle,
-    text: &PostText,
-    img: &PostImg,
-    version: i32,
-    pool: &PgPool,
-) -> Result<(), PostError> {
-    let result = sqlx::query!(
-        r#"
-        UPDATE posts
-        SET title = $1, post_text = $2, img = $3, version = version + 1
-        WHERE id = $4 AND version = $5
-        "#,
-        title.as_ref(),
-        text.as_ref(),
-        img.as_ref(),
-        id,
-        version
-    )
-    .execute(pool)
-    .await
-    .context("Failed to execute update query")?;
-
-    if result.rows_affected() == 0 {
-        return Err(PostError::EditConflict);
-    }
-
-    Ok(())
-}
-
-#[tracing::instrument(
-    skip(pool),
-    fields(post_id=%path.id, user_id=%&*user_id)
-)]
 pub async fn delete_post(
     path: web::Path<PostPathParams>,
     pool: web::Data<PgPool>,
@@ -340,30 +183,16 @@ pub async fn delete_post(
     let user_id = *user_id.into_inner();
     let is_admin = *is_admin.into_inner();
 
-    // If not admin, verify ownership
+    // if not admin, then verify ownership
     if !is_admin {
-        let is_owner = did_user_create_the_post(post_id, user_id, &pool).await?;
-
+        let is_owner = repository::post::did_user_create_the_post(post_id, user_id, &pool).await?;
         if !is_owner {
             return Err(PostError::Forbidden);
         }
     }
 
-    // Soft delete: mark deleted_at = now()
-    let result = sqlx::query!(
-        r#"
-        UPDATE posts
-        SET deleted_at = $1
-        WHERE id = $2 AND deleted_at IS NULL
-        "#,
-        Utc::now(),
-        post_id
-    )
-    .execute(&**pool)
-    .await
-    .context("Failed to mark posts as deleted")?;
-
-    if result.rows_affected() == 0 {
+    let deleted = repository::post::soft_delete_post(post_id, &pool).await?;
+    if !deleted {
         return Err(PostError::NotFound);
     }
 
@@ -382,9 +211,9 @@ pub async fn like_post(
     let post_id = path.id;
     let user_id = user_id.into_inner();
 
-    let post = get_post_by_id(post_id, &pool).await?;
+    let post = repository::get_post(post_id, &pool).await?;
 
-    add_like_to_post(post_id, *user_id, &pool).await?;
+    repository::add_like_to_post(post_id, *user_id, &pool).await?;
 
     Ok(HttpResponse::Ok().json(serde_json::json!({ "posts": post })))
 }
@@ -401,89 +230,9 @@ pub async fn dislike_post(
     let post_id = path.id;
     let user_id = user_id.into_inner();
 
-    let post = get_post_by_id(post_id, &pool).await?;
+    let post = repository::get_post(post_id, &pool).await?;
 
-    remove_like_from_post(post_id, *user_id, &pool).await?;
+    repository::remove_like_from_post(post_id, *user_id, &pool).await?;
 
     Ok(HttpResponse::Ok().json(serde_json::json!({ "posts": post })))
-}
-
-#[tracing::instrument(skip(pool))]
-async fn add_like_to_post(post_id: Uuid, user_id: Uuid, pool: &PgPool) -> Result<(), PostError> {
-    // unnest() converts an array into a set of rows (like a table column).
-    // t(x) means "create a temporary table t with one column x holding each value from the array."
-    // `array_agg(DISTINCT x)` takes all those rows and aggregate them back into an array using DISTINCT to remove duplicates.
-    let result = sqlx::query!(
-        r#"
-        UPDATE posts
-        SET liked_by = (
-            SELECT array_agg(DISTINCT x)
-            FROM unnest(array_append(liked_by, $1)) t(x)
-        )
-        WHERE id = $2 AND deleted_at IS NULL
-        "#,
-        user_id,
-        post_id
-    )
-    .execute(pool)
-    .await
-    .context("Failed to add like to posts")?;
-
-    if result.rows_affected() == 0 {
-        return Err(PostError::NotFound);
-    }
-
-    Ok(())
-}
-
-#[tracing::instrument(skip(pool))]
-async fn remove_like_from_post(
-    post_id: Uuid,
-    user_id: Uuid,
-    pool: &PgPool,
-) -> Result<(), PostError> {
-    let result = sqlx::query!(
-        r#"
-        UPDATE posts
-        SET liked_by = array_remove(liked_by, $1)
-        WHERE id = $2 AND deleted_at IS NULL
-        "#,
-        user_id,
-        post_id
-    )
-    .execute(pool)
-    .await
-    .context("Failed to remove like from posts")?;
-
-    if result.rows_affected() == 0 {
-        return Err(PostError::NotFound);
-    }
-
-    Ok(())
-}
-
-#[tracing::instrument(skip(pool))]
-pub async fn did_user_create_the_post(
-    post_id: Uuid,
-    user_id: Uuid,
-    pool: &PgPool,
-) -> Result<bool, PostError> {
-    let result = sqlx::query_scalar!(
-        r#"
-        SELECT EXISTS(
-            SELECT 1
-            FROM posts
-            WHERE id = $1
-            AND created_by = $2
-            AND deleted_at IS NULL
-        ) AS "exists!"
-        "#,
-        post_id,
-        user_id
-    )
-    .fetch_one(pool)
-    .await
-    .context("Failed to check if user created this post")?;
-
-    Ok(result)
 }

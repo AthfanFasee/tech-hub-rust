@@ -1,16 +1,14 @@
 use std::fmt::{self, Debug, Formatter};
 
 use actix_web::{HttpRequest, HttpResponse, ResponseError, http::StatusCode, web};
-use anyhow::Context;
-use sqlx::{Executor, PgPool, Postgres, Transaction};
-use uuid::Uuid;
+use sqlx::PgPool;
 
 use crate::{
     authentication::UserId,
     domain::{NewsLetterData, Newsletter},
     idempotency,
     idempotency::{IdempotencyKey, NextAction},
-    utils,
+    repository, utils,
 };
 
 #[derive(thiserror::Error)]
@@ -83,7 +81,7 @@ pub async fn publish_newsletter(
             }
         };
 
-    let issue_id = insert_newsletter_issue(
+    let issue_id = repository::insert_newsletter_issue(
         &mut transaction,
         newsletter.title.as_ref(),
         newsletter.content.text.as_ref(),
@@ -91,64 +89,10 @@ pub async fn publish_newsletter(
     )
     .await?;
 
-    enqueue_delivery_tasks(&mut transaction, issue_id).await?;
+    repository::enqueue_delivery_tasks(&mut transaction, issue_id).await?;
 
     let response = HttpResponse::Ok().finish();
     let response =
         idempotency::save_response(transaction, &idempotency_key, *user_id, response).await?;
     Ok(response)
-}
-
-#[tracing::instrument(skip_all)]
-async fn insert_newsletter_issue(
-    transaction: &mut Transaction<'_, Postgres>,
-    title: &str,
-    text_content: &str,
-    html_content: &str,
-) -> Result<Uuid, anyhow::Error> {
-    let newsletter_issue_id = Uuid::new_v4();
-    let query = sqlx::query!(
-        r#"
-        INSERT INTO newsletter_issues (
-        id,
-        title,
-        text_content,
-        html_content
-        )
-        VALUES ($1, $2, $3, $4)
-        "#,
-        newsletter_issue_id,
-        title,
-        text_content,
-        html_content
-    );
-    transaction
-        .execute(query)
-        .await
-        .context("Failed to store newsletter issue details")?;
-    Ok(newsletter_issue_id)
-}
-
-#[tracing::instrument(skip(transaction))]
-async fn enqueue_delivery_tasks(
-    transaction: &mut Transaction<'_, Postgres>,
-    newsletter_issue_id: Uuid,
-) -> Result<(), anyhow::Error> {
-    let query = sqlx::query!(
-        r#"
-        INSERT INTO issue_delivery_queue (
-        newsletter_issue_id,
-        user_email
-        )
-        SELECT $1, email
-        FROM users
-        WHERE is_activated = true and is_subscribed = true
-        "#,
-        newsletter_issue_id,
-    );
-    transaction
-        .execute(query)
-        .await
-        .context("Failed to enqueue delivery tasks")?;
-    Ok(())
 }

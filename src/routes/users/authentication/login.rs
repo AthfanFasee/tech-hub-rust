@@ -1,15 +1,14 @@
 use std::fmt::{self, Debug, Formatter};
 
 use actix_web::{HttpResponse, ResponseError, http::StatusCode, web};
-use anyhow::Context;
 use sqlx::PgPool;
 use tracing::Span;
-use uuid::Uuid;
 
 use crate::{
     authentication,
     authentication::{AuthError, Credentials},
     domain::LoginData,
+    repository,
     session_state::TypedSession,
     utils,
 };
@@ -63,7 +62,7 @@ pub async fn login(
             AuthError::UnexpectedError(_) => LoginError::UnexpectedError(e.into()),
         })?;
 
-    let is_admin = is_admin_user(user_id, &pool).await?;
+    let is_admin = repository::is_admin_user(user_id, &pool).await?;
 
     session.renew();
     session.insert_user_id(user_id)?;
@@ -80,24 +79,4 @@ pub async fn log_out(session: TypedSession) -> Result<HttpResponse, LoginError> 
 #[tracing::instrument()]
 pub async fn protected_endpoint() -> Result<HttpResponse, LoginError> {
     Ok(HttpResponse::Ok().finish())
-}
-
-pub async fn is_admin_user(user_id: Uuid, pool: &PgPool) -> Result<bool, anyhow::Error> {
-    let record = sqlx::query!(
-        r#"
-        SELECT is_admin
-        FROM users
-        WHERE id = $1
-        "#,
-        user_id
-    )
-    .fetch_optional(pool)
-    .await
-    .context("Failed to fetch admin flag for user")?;
-
-    let is_admin = record
-        .map(|r| r.is_admin)
-        .ok_or_else(|| anyhow::anyhow!("No user found"))?;
-
-    Ok(is_admin)
 }

@@ -2,12 +2,14 @@ use std::ops::DerefMut;
 
 use anyhow::Context;
 use rand::{Rng, SeedableRng, rngs::StdRng};
-use sqlx::{Executor, PgPool, Postgres, Transaction};
+use sqlx::{Executor, PgPool};
 use tokio::{time, time::Duration};
 use tracing::{Span, field};
 use uuid::Uuid;
 
-use crate::{configuration::Configuration, domain::UserEmail, email_client::EmailClient, startup};
+use crate::{
+    configuration::Configuration, domain::UserEmail, email_client::EmailClient, repository, startup,
+};
 
 pub enum ExecutionOutcome {
     TaskCompleted,
@@ -28,10 +30,10 @@ async fn worker_loop(pool: PgPool, email_client: EmailClient) -> Result<(), anyh
         let mut rng = StdRng::from_entropy();
 
         loop {
-            if let Err(e) = cleanup_old_idempotency_records(&pool_for_cleanup).await {
+            if let Err(e) = repository::cleanup_old_idempotency_records(&pool_for_cleanup).await {
                 tracing::error!(error.cause_chain = ?e, "Idempotency cleanup failed");
             }
-            if let Err(e) = cleanup_old_newsletter_issues(&pool_for_cleanup).await {
+            if let Err(e) = repository::cleanup_old_newsletter_issues(&pool_for_cleanup).await {
                 tracing::error!(error.cause_chain = ?e, "Old newsletter cleanup failed");
             }
 
@@ -145,7 +147,7 @@ pub async fn try_execute_task(
     ),
 )]
 async fn process_delivery_task(
-    transaction: &mut PgTransaction,
+    transaction: &mut repository::PgTransaction,
     issue_id: Uuid,
     email: &str,
     n_retries: i32,
@@ -161,15 +163,15 @@ async fn process_delivery_task(
     };
 
     // Fetch issue content
-    let issue = get_newsletter_issue(transaction, issue_id).await?;
+    let issue = repository::get_newsletter_issue(transaction, issue_id).await?;
 
     // Try sending the email
     match email_client
         .send_email(
             &valid_email,
-            &issue.title,
-            &issue.html_content,
-            &issue.text_content,
+            &issue.title(),
+            &issue.html_content(),
+            &issue.text_content(),
         )
         .await
     {
@@ -190,11 +192,9 @@ async fn process_delivery_task(
     Ok(())
 }
 
-type PgTransaction = Transaction<'static, Postgres>;
-
 async fn dequeue_task(
     pool: &PgPool,
-) -> Result<Option<(PgTransaction, Uuid, String, i32)>, anyhow::Error> {
+) -> Result<Option<(repository::PgTransaction, Uuid, String, i32)>, anyhow::Error> {
     let mut transaction = pool
         .begin()
         .await
@@ -234,7 +234,7 @@ async fn dequeue_task(
     ),
 )]
 async fn retry_task(
-    transaction: &mut PgTransaction,
+    transaction: &mut repository::PgTransaction,
     issue_id: Uuid,
     email: &str,
     current_retry: i32,
@@ -274,7 +274,7 @@ async fn retry_task(
 }
 
 async fn delete_task(
-    transaction: &mut PgTransaction,
+    transaction: &mut repository::PgTransaction,
     issue_id: Uuid,
     email: &str,
 ) -> Result<(), anyhow::Error> {
@@ -293,59 +293,5 @@ async fn delete_task(
         .await
         .context("Failed delete a newsletter issue task from db")?;
 
-    Ok(())
-}
-
-struct NewsletterIssue {
-    title: String,
-    text_content: String,
-    html_content: String,
-}
-
-async fn get_newsletter_issue(
-    transaction: &mut PgTransaction,
-    issue_id: Uuid,
-) -> Result<NewsletterIssue, anyhow::Error> {
-    let issue = sqlx::query_as!(
-        NewsletterIssue,
-        r#"
-        SELECT title, text_content, html_content
-        FROM newsletter_issues
-        WHERE id = $1
-        "#,
-        issue_id
-    )
-    .fetch_one(&mut **transaction)
-    .await
-    .context("Failed to get newsletter issue details")?;
-
-    Ok(issue)
-}
-
-pub async fn cleanup_old_idempotency_records(pool: &PgPool) -> Result<(), anyhow::Error> {
-    let deleted =
-        sqlx::query!(r#"DELETE FROM idempotency WHERE created_at < NOW() - INTERVAL '48 hours'"#)
-            .execute(pool)
-            .await?
-            .rows_affected();
-
-    tracing::info!(deleted, "Idempotency cleanup completed");
-    Ok(())
-}
-
-// Moving to an archive table rather than deleting would be preferable if you want to record keep
-#[tracing::instrument(skip(pool))]
-pub async fn cleanup_old_newsletter_issues(pool: &PgPool) -> Result<(), anyhow::Error> {
-    let deleted = sqlx::query!(
-        r#"
-        DELETE FROM newsletter_issues
-        WHERE created_at < NOW() - INTERVAL '7 days'
-        "#,
-    )
-    .execute(pool)
-    .await?
-    .rows_affected();
-
-    tracing::info!(deleted, "Old newsletter issues cleanup completed");
     Ok(())
 }

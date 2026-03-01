@@ -1,6 +1,8 @@
 use reqwest::{Response, header::HeaderMap};
 use serde_json::Value;
-use techhub::{newsletter_delivery_worker, newsletter_delivery_worker::ExecutionOutcome};
+use techhub::{
+    newsletter_delivery_worker, newsletter_delivery_worker::ExecutionOutcome, repository,
+};
 
 use crate::helpers::TestApp;
 
@@ -41,5 +43,17 @@ impl TestApp {
                 break;
             }
         }
+    }
+
+    pub async fn cleanup_old_newsletter_issues(&self) {
+        repository::cleanup_old_newsletter_issues(&self.db_pool)
+            .await
+            .unwrap();
+    }
+
+    pub async fn cleanup_old_idempotency_records(&self) {
+        repository::cleanup_old_idempotency_records(&self.db_pool)
+            .await
+            .unwrap();
     }
 }
